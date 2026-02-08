@@ -11,7 +11,7 @@ import Reports from './pages/reports/Reports';
 const App: React.FC = () => {
   // Simulação de autenticação - em um ambiente real, isso seria verificado com o backend
   // Desativado temporariamente para permitir acesso direto ao dashboard para testes locais
-  const isAuthenticated = true; // localStorage.getItem('auth') === 'true';
+  const { user } = useAuth(); // localStorage.getItem('auth') === 'true';
 
   return (
     <Router>
