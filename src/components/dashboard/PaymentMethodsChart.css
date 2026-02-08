@@ -1,0 +1,13 @@
+.payment-methods-chart-container {
+  width: 100%;
+  background-color: white;
+  border-radius: var(--border-radius-md);
+  padding: var(--spacing-md);
+  box-shadow: var(--shadow-sm);
+}
+
+@media (max-width: 768px) {
+  .payment-methods-chart-container {
+    padding: var(--spacing-sm);
+  }
+}

@@ -1,0 +1,103 @@
+.dashboard-container {
+  display: flex;
+  min-height: 100vh;
+  background-color: #f8f9fa;
+}
+
+.dashboard-content {
+  flex: 1;
+  padding: var(--spacing-md);
+  margin-left: 250px; /* Espaço para a sidebar */
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-gap: var(--spacing-lg);
+  margin-top: var(--spacing-lg);
+  max-height: 100vh;
+  overflow-y: auto;
+}
+
+/* Métricas */
+.metrics-container {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-gap: var(--spacing-md);
+}
+
+/* Gráficos */
+.charts-container {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  grid-gap: var(--spacing-md);
+  margin-top: var(--spacing-lg);
+}
+
+.chart-card {
+  background-color: white;
+  border-radius: var(--border-radius-md);
+  box-shadow: var(--shadow-sm);
+  padding: var(--spacing-md);
+  max-height: 400px;
+  overflow: hidden;
+}
+
+.chart-card h3 {
+  margin-top: 0;
+  color: var(--dark);
+  font-size: var(--font-size-lg);
+  margin-bottom: var(--spacing-md);
+  padding-bottom: var(--spacing-sm);
+  border-bottom: 1px solid #eee;
+}
+
+/* Pedidos Recentes */
+.recent-orders-container {
+  background-color: white;
+  border-radius: var(--border-radius-md);
+  box-shadow: var(--shadow-sm);
+  padding: var(--spacing-md);
+  margin-top: var(--spacing-lg);
+}
+
+.recent-orders-container h3 {
+  margin-top: 0;
+  color: var(--dark);
+  font-size: var(--font-size-lg);
+  margin-bottom: var(--spacing-md);
+  padding-bottom: var(--spacing-sm);
+  border-bottom: 1px solid #eee;
+}
+
+/* Responsividade */
+@media (max-width: 1200px) {
+  .metrics-container {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .charts-container {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .dashboard-content {
+    margin-left: 0;
+    padding: var(--spacing-sm);
+  }
+  
+  .metrics-container {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Animações */
+.dashboard-grid {
+  animation: fadeIn var(--transition-normal) forwards;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}

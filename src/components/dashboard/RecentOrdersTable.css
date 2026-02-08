@@ -1,0 +1,94 @@
+.recent-orders-table-container {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.recent-orders-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.recent-orders-table th,
+.recent-orders-table td {
+  padding: var(--spacing-sm);
+  text-align: left;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.recent-orders-table th {
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.recent-orders-table td {
+  font-size: 0.9rem;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--border-radius-sm);
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.status-pending {
+  background-color: var(--color-warning-light);
+  color: var(--color-warning);
+}
+
+.status-processing {
+  background-color: var(--color-primary-light);
+  color: var(--color-primary);
+}
+
+.status-shipping {
+  background-color: var(--color-info-light);
+  color: var(--color-info);
+}
+
+.status-completed {
+  background-color: var(--color-success-light);
+  color: var(--color-success);
+}
+
+.status-canceled {
+  background-color: var(--color-danger-light);
+  color: var(--color-danger);
+}
+
+.loading-skeleton {
+  width: 100%;
+}
+
+.skeleton-row {
+  height: 20px;
+  background-color: #f0f0f0;
+  margin-bottom: 10px;
+  border-radius: 4px;
+  animation: pulse 1.5s infinite;
+}
+
+.skeleton-row.header {
+  height: 24px;
+}
+
+.no-orders-message {
+  padding: var(--spacing-md);
+  text-align: center;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 0.8;
+  }
+  100% {
+    opacity: 0.6;
+  }
+}
