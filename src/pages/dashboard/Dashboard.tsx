@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { DollarSign, ClipboardCheck, Clock, Trophy } from 'lucide-react';
 import './Dashboard.css';
 import '../../styles/theme.css';
 import Sidebar from '../../components/common/Sidebar';
@@ -86,28 +87,28 @@ const Dashboard: React.FC = () => {
             <MetricCard 
               title="Vendas Hoje" 
               value={`R$ ${metrics.totalSales.toFixed(2)}`} 
-              icon="bi-cash-coin" 
+              icon={<DollarSign size={24} />}
               color="primary"
               isLoading={isLoading}
             />
             <MetricCard 
               title="Pedidos em Andamento" 
               value={metrics.ordersInProgress.toString()} 
-              icon="bi-clipboard-check" 
+              icon={<ClipboardCheck size={24} />}
               color="warning"
               isLoading={isLoading}
             />
             <MetricCard 
               title="Tempo Médio" 
               value={`${metrics.averageTime} min`} 
-              icon="bi-clock" 
+              icon={<Clock size={24} />}
               color="info"
               isLoading={isLoading}
             />
             <MetricCard 
               title="Produto Mais Vendido" 
               value={metrics.topProduct} 
-              icon="bi-trophy" 
+              icon={<Trophy size={24} />}
               color="success"
               isLoading={isLoading}
             />
