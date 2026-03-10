@@ -3,6 +3,7 @@ import './PDV.css';
 import '../../styles/theme.css';
 import Sidebar from '../../components/common/Sidebar';
 import Header from '../../components/common/Header';
+import { X, Plus, Minus, Trash2, ShoppingCart } from 'lucide-react';
 
 // Tipos
 interface Product {
@@ -21,6 +22,14 @@ interface OrderItem {
   price: number;
   quantity: number;
   notes: string;
+  extras: OrderItemExtra[];
+}
+
+interface OrderItemExtra {
+  id: number;
+  name: string;
+  price: number;
+  quantity: number;
 }
 
 interface Customer {
@@ -30,28 +39,56 @@ interface Customer {
   address: string;
 }
 
+interface Extra {
+  id: number;
+  name: string;
+  price: number;
+}
+
 const PDV: React.FC = () => {
   // Estados
-  const [activeCategory, setActiveCategory] = useState<string>('all');
+  const [activeCategory, setActiveCategory] = useState<string>('Tradicionais');
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<string>('');
-  // const [notes, setNotes] = useState<string>('');
   const [showProductModal, setShowProductModal] = useState<boolean>(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [productQuantity, setProductQuantity] = useState<number>(1);
   const [productNotes, setProductNotes] = useState<string>('');
+  const [productExtras, setProductExtras] = useState<OrderItemExtra[]>([]);
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
 
-  // Categorias baseadas no cardápio real
+  // Categorias ordenadas
   const categories = [
-    { id: 'all', name: 'Todos', icon: 'bi-grid' },
-    { id: 'Burgers Artesanais', name: 'Artesanais', icon: 'bi-egg-fried' },
     { id: 'Tradicionais', name: 'Tradicionais', icon: 'bi-hamburger' },
+    { id: 'Burgers Artesanais', name: 'Artesanais', icon: 'bi-egg-fried' },
     { id: 'Passaportes', name: 'Passaportes', icon: 'bi-box' },
     { id: 'Bebidas', name: 'Bebidas', icon: 'bi-cup-straw' }
   ];
+
+  // Adicionais disponíveis
+  const extrasAvailable: Record<string, Extra[]> = {
+    'Tradicionais': [
+      { id: 1, name: 'Bacon Extra', price: 3.00 },
+      { id: 2, name: 'Queijo Extra', price: 2.00 },
+      { id: 3, name: 'Ovo Extra', price: 2.50 },
+      { id: 4, name: 'Calabresa Extra', price: 3.00 },
+      { id: 5, name: 'Catupiry Extra', price: 2.50 },
+    ],
+    'Burgers Artesanais': [
+      { id: 1, name: 'Bacon Extra', price: 3.50 },
+      { id: 2, name: 'Queijo Extra', price: 2.50 },
+      { id: 3, name: 'Ovo Extra', price: 3.00 },
+      { id: 4, name: 'Presunto Extra', price: 3.00 },
+    ],
+    'Passaportes': [
+      { id: 1, name: 'Frango Extra', price: 3.00 },
+      { id: 2, name: 'Calabresa Extra', price: 3.50 },
+      { id: 3, name: 'Catupiry Extra', price: 2.50 },
+      { id: 4, name: 'Bacon Extra', price: 3.50 },
+    ],
+  };
 
   // Produtos extraídos do cardápio digital
   const products: Product[] = [
@@ -109,15 +146,21 @@ const PDV: React.FC = () => {
   // Filtragem de produtos
   const filteredProducts = useMemo(() => {
     return products.filter(product => {
-      const matchesCategory = activeCategory === 'all' || product.category === activeCategory;
+      const matchesCategory = product.category === activeCategory;
       const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase());
       return matchesCategory && matchesSearch;
     });
   }, [activeCategory, searchTerm]);
 
   // Cálculos do pedido
-  const subtotal = orderItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  const tax = 0; // Removido taxa de serviço por padrão
+  const calculateItemTotal = (item: OrderItem) => {
+    const basePrice = item.price * item.quantity;
+    const extrasPrice = item.extras.reduce((sum, extra) => sum + (extra.price * extra.quantity), 0);
+    return basePrice + extrasPrice;
+  };
+
+  const subtotal = orderItems.reduce((sum, item) => sum + calculateItemTotal(item), 0);
+  const tax = 0;
   const total = subtotal + tax;
 
   // Handlers
@@ -125,14 +168,38 @@ const PDV: React.FC = () => {
     setSelectedProduct(product);
     setProductQuantity(1);
     setProductNotes('');
+    setProductExtras([]);
     setShowProductModal(true);
+  };
+
+  const handleAddExtraQuantity = (extraId: number) => {
+    setProductExtras(productExtras.map(extra => 
+      extra.id === extraId ? { ...extra, quantity: extra.quantity + 1 } : extra
+    ));
+  };
+
+  const handleRemoveExtraQuantity = (extraId: number) => {
+    setProductExtras(productExtras.map(extra => 
+      extra.id === extraId && extra.quantity > 0 ? { ...extra, quantity: extra.quantity - 1 } : extra
+    ).filter(extra => extra.quantity > 0));
+  };
+
+  const handleToggleExtra = (extra: Extra) => {
+    const existingExtra = productExtras.find(e => e.id === extra.id);
+    if (existingExtra) {
+      setProductExtras(productExtras.filter(e => e.id !== extra.id));
+    } else {
+      setProductExtras([...productExtras, { ...extra, quantity: 1 }]);
+    }
   };
 
   const handleAddToOrder = () => {
     if (!selectedProduct) return;
     
     const existingItemIndex = orderItems.findIndex(item => 
-      item.productId === selectedProduct.id && item.notes === productNotes
+      item.productId === selectedProduct.id && 
+      item.notes === productNotes &&
+      JSON.stringify(item.extras) === JSON.stringify(productExtras)
     );
     
     if (existingItemIndex >= 0) {
@@ -146,7 +213,8 @@ const PDV: React.FC = () => {
         name: selectedProduct.name,
         price: selectedProduct.price,
         quantity: productQuantity,
-        notes: productNotes
+        notes: productNotes,
+        extras: productExtras
       };
       setOrderItems([...orderItems, newItem]);
     }
@@ -167,11 +235,29 @@ const PDV: React.FC = () => {
   };
 
   const handleFinishOrder = () => {
-    alert(`Pedido finalizado! Total: R$ ${total.toFixed(2)}`);
+    if (orderItems.length === 0 || !paymentMethod) return;
+    
+    const orderSummary = orderItems.map(item => {
+      let itemText = `${item.quantity}x ${item.name}`;
+      if (item.extras.length > 0) {
+        itemText += ` (${item.extras.map(e => `${e.quantity}x ${e.name}`).join(', ')})`;
+      }
+      if (item.notes) {
+        itemText += ` - Obs: ${item.notes}`;
+      }
+      return itemText;
+    }).join('\n');
+
+    const message = `Pedido La Chapa:\n\n${orderSummary}\n\nTotal: R$ ${total.toFixed(2)}\nForma de Pagamento: ${paymentMethod}`;
+    
+    // Enviar para WhatsApp
+    const whatsappNumber = '558298214100'; // +55 82 98214-1000 sem formatação
+    const encodedMessage = encodeURIComponent(message);
+    window.open(`https://wa.me/${whatsappNumber}?text=${encodedMessage}`, '_blank');
+    
     setOrderItems([]);
     setSelectedCustomer(null);
     setPaymentMethod('');
-    // setNotes('');
   };
 
   return (
@@ -230,8 +316,11 @@ const PDV: React.FC = () => {
                     <p className="product-card-desc">{product.description?.substring(0, 60)}...</p>
                     <div className="product-card-footer">
                       <span className="product-card-price">R$ {product.price.toFixed(2)}</span>
-                      <button className="product-card-add">
-                        <i className="bi bi-plus"></i>
+                      <button className="product-card-add" onClick={(e) => {
+                        e.stopPropagation();
+                        handleProductClick(product);
+                      }}>
+                        <Plus size={18} />
                       </button>
                     </div>
                   </div>
@@ -249,7 +338,7 @@ const PDV: React.FC = () => {
                   <span className="order-items-count">{orderItems.length} itens</span>
                 </div>
                 <button className="btn-icon-clear" onClick={() => setOrderItems([])} title="Limpar Pedido">
-                  <i className="bi bi-trash3"></i>
+                  <Trash2 size={18} />
                 </button>
               </div>
               
@@ -267,7 +356,7 @@ const PDV: React.FC = () => {
                         <p className="customer-phone">{selectedCustomer.phone}</p>
                       </div>
                       <button className="btn-remove-customer" onClick={() => setSelectedCustomer(null)}>
-                        <i className="bi bi-x"></i>
+                        <X size={18} />
                       </button>
                     </div>
                   ) : (
@@ -287,7 +376,7 @@ const PDV: React.FC = () => {
                   {orderItems.length === 0 ? (
                     <div className="empty-order-state">
                       <div className="empty-icon">
-                        <i className="bi bi-cart-x"></i>
+                        <ShoppingCart size={32} />
                       </div>
                       <p>Seu carrinho está vazio</p>
                       <span>Selecione produtos ao lado</span>
@@ -300,20 +389,27 @@ const PDV: React.FC = () => {
                             <div className="item-qty-badge">{item.quantity}x</div>
                             <div className="item-text">
                               <p className="item-name">{item.name}</p>
+                              {item.extras.length > 0 && (
+                                <p className="item-extras">{item.extras.map(e => `${e.quantity}x ${e.name}`).join(', ')}</p>
+                              )}
                               {item.notes && <p className="item-subtext">{item.notes}</p>}
                             </div>
                             <div className="item-price-total">
-                              R$ {(item.price * item.quantity).toFixed(2)}
+                              R$ {calculateItemTotal(item).toFixed(2)}
                             </div>
                           </div>
                           <div className="item-controls">
                             <div className="qty-stepper">
-                              <button onClick={() => handleUpdateQuantity(item.id, item.quantity - 1)}>-</button>
+                              <button onClick={() => handleUpdateQuantity(item.id, item.quantity - 1)}>
+                                <Minus size={14} />
+                              </button>
                               <span>{item.quantity}</span>
-                              <button onClick={() => handleUpdateQuantity(item.id, item.quantity + 1)}>+</button>
+                              <button onClick={() => handleUpdateQuantity(item.id, item.quantity + 1)}>
+                                <Plus size={14} />
+                              </button>
                             </div>
                             <button className="btn-item-delete" onClick={() => handleRemoveItem(item.id)}>
-                              <i className="bi bi-trash"></i>
+                              <Trash2 size={14} />
                             </button>
                           </div>
                         </div>
@@ -360,7 +456,7 @@ const PDV: React.FC = () => {
                   disabled={orderItems.length === 0 || !paymentMethod}
                   onClick={handleFinishOrder}
                 >
-                  <i className="bi bi-check2-circle"></i>
+                  <ShoppingCart size={18} />
                   <span>Finalizar Pedido</span>
                 </button>
               </div>
@@ -378,7 +474,7 @@ const PDV: React.FC = () => {
                 (e.target as HTMLImageElement).src = 'https://via.placeholder.com/400x200?text=LaChapa';
               }} />
               <button className="modal-close-btn" onClick={() => setShowProductModal(false)}>
-                <i className="bi bi-x-lg"></i>
+                <X size={24} />
               </button>
             </div>
             <div className="modal-content">
@@ -387,6 +483,44 @@ const PDV: React.FC = () => {
                 <p className="modal-product-price">R$ {selectedProduct.price.toFixed(2)}</p>
                 <p className="modal-product-desc">{selectedProduct.description}</p>
               </div>
+              
+              {/* Adicionais - apenas para não-bebidas */}
+              {selectedProduct.category !== 'Bebidas' && extrasAvailable[selectedProduct.category] && (
+                <div className="modal-extras-section">
+                  <h3>Adicionais</h3>
+                  <div className="extras-list">
+                    {extrasAvailable[selectedProduct.category].map(extra => {
+                      const selectedExtra = productExtras.find(e => e.id === extra.id);
+                      return (
+                        <div key={extra.id} className="extra-item">
+                          <div className="extra-info">
+                            <label>
+                              <input 
+                                type="checkbox" 
+                                checked={!!selectedExtra}
+                                onChange={() => handleToggleExtra(extra)}
+                              />
+                              <span>{extra.name}</span>
+                            </label>
+                            <span className="extra-price">+R$ {extra.price.toFixed(2)}</span>
+                          </div>
+                          {selectedExtra && (
+                            <div className="extra-qty-control">
+                              <button onClick={() => handleRemoveExtraQuantity(extra.id)}>
+                                <Minus size={14} />
+                              </button>
+                              <span>{selectedExtra.quantity}</span>
+                              <button onClick={() => handleAddExtraQuantity(extra.id)}>
+                                <Plus size={14} />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
               
               <div className="modal-form-group">
                 <label>Observações do Item</label>
@@ -399,12 +533,16 @@ const PDV: React.FC = () => {
               
               <div className="modal-footer">
                 <div className="modal-qty-selector">
-                  <button onClick={() => setProductQuantity(Math.max(1, productQuantity - 1))}>-</button>
+                  <button onClick={() => setProductQuantity(Math.max(1, productQuantity - 1))}>
+                    <Minus size={16} />
+                  </button>
                   <span>{productQuantity}</span>
-                  <button onClick={() => setProductQuantity(productQuantity + 1)}>+</button>
+                  <button onClick={() => setProductQuantity(productQuantity + 1)}>
+                    <Plus size={16} />
+                  </button>
                 </div>
                 <button className="btn-modal-add" onClick={handleAddToOrder}>
-                  Adicionar ao Pedido • R$ {(selectedProduct.price * productQuantity).toFixed(2)}
+                  Adicionar ao Pedido • R$ {(selectedProduct.price * productQuantity + productExtras.reduce((sum, e) => sum + (e.price * e.quantity), 0)).toFixed(2)}
                 </button>
               </div>
             </div>
