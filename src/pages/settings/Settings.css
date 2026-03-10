@@ -16,6 +16,7 @@
   overflow-x: auto;
   padding-bottom: var(--spacing-sm);
   margin-bottom: var(--spacing-md);
+  margin-top: var(--spacing-lg);
 }
 
 .tab-btn {
