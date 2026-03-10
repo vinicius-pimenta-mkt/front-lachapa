@@ -4,13 +4,14 @@ import '../../styles/theme.css';
 
 interface HeaderProps {
   title: string;
+  onMenuClick?: () => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ title }) => {
+const Header: React.FC<HeaderProps> = ({ title, onMenuClick }) => {
   return (
     <header className="main-header">
       <div className="header-left">
-        <button className="menu-toggle">
+        <button className="menu-toggle" onClick={onMenuClick}>
           <i className="bi bi-list"></i>
         </button>
         <h1>{title}</h1>
@@ -33,7 +34,7 @@ const Header: React.FC<HeaderProps> = ({ title }) => {
           </button>
           
           <div className="user-profile">
-            <img src="/avatar.png" alt="Usuário" />
+            <img src="https://via.placeholder.com/32?text=A" alt="Usuário" />
             <span>Admin</span>
             <i className="bi bi-chevron-down"></i>
           </div>
