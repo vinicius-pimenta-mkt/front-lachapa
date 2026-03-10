@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import './PDV.css';
 import '../../styles/theme.css';
 import Sidebar from '../../components/common/Sidebar';
@@ -11,6 +11,7 @@ interface Product {
   price: number;
   image: string;
   category: string;
+  description?: string;
 }
 
 interface OrderItem {
@@ -36,47 +37,87 @@ const PDV: React.FC = () => {
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<string>('');
-  const [notes, setNotes] = useState<string>('');
+  // const [notes, setNotes] = useState<string>('');
   const [showProductModal, setShowProductModal] = useState<boolean>(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [productQuantity, setProductQuantity] = useState<number>(1);
   const [productNotes, setProductNotes] = useState<string>('');
+  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
 
-  // Dados simulados
+  // Categorias baseadas no cardápio real
   const categories = [
     { id: 'all', name: 'Todos', icon: 'bi-grid' },
-    { id: 'burgers', name: 'Hambúrgueres', icon: 'bi-egg-fried' },
-    { id: 'drinks', name: 'Bebidas', icon: 'bi-cup-straw' },
-    { id: 'sides', name: 'Acompanhamentos', icon: 'bi-basket' },
-    { id: 'desserts', name: 'Sobremesas', icon: 'bi-cake' },
-    { id: 'combos', name: 'Combos', icon: 'bi-box' }
+    { id: 'Burgers Artesanais', name: 'Artesanais', icon: 'bi-egg-fried' },
+    { id: 'Tradicionais', name: 'Tradicionais', icon: 'bi-hamburger' },
+    { id: 'Passaportes', name: 'Passaportes', icon: 'bi-box' },
+    { id: 'Bebidas', name: 'Bebidas', icon: 'bi-cup-straw' }
   ];
 
+  // Produtos extraídos do cardápio digital
   const products: Product[] = [
-    { id: 1, name: 'X-Tudo', price: 25.90, image: '/products/x-tudo.jpg', category: 'burgers' },
-    { id: 2, name: 'X-Salada', price: 18.90, image: '/products/x-salada.jpg', category: 'burgers' },
-    { id: 3, name: 'X-Bacon', price: 22.90, image: '/products/x-bacon.jpg', category: 'burgers' },
-    { id: 4, name: 'Refrigerante Lata', price: 6.00, image: '/products/refrigerante.jpg', category: 'drinks' },
-    { id: 5, name: 'Suco Natural', price: 8.00, image: '/products/suco.jpg', category: 'drinks' },
-    { id: 6, name: 'Batata Frita P', price: 10.00, image: '/products/batata-p.jpg', category: 'sides' },
-    { id: 7, name: 'Batata Frita M', price: 15.00, image: '/products/batata-m.jpg', category: 'sides' },
-    { id: 8, name: 'Batata Frita G', price: 20.00, image: '/products/batata-g.jpg', category: 'sides' },
-    { id: 9, name: 'Sorvete', price: 8.00, image: '/products/sorvete.jpg', category: 'desserts' },
-    { id: 10, name: 'Combo 1', price: 35.90, image: '/products/combo1.jpg', category: 'combos' },
-    { id: 11, name: 'Combo 2', price: 45.90, image: '/products/combo2.jpg', category: 'combos' },
-    { id: 12, name: 'Combo Família', price: 65.90, image: '/products/combo-familia.jpg', category: 'combos' }
+    // Burgers Artesanais
+    { id: 1, name: 'La Costela', price: 24.00, image: 'https://lachapa-cardapio.vercel.app/images/la-costela.jpg', category: 'Burgers Artesanais', description: 'Pão brioche, hambúrguer de Costela 130g, presunto, queijo cheddar, bacon crocante, molho barbecue e salada.' },
+    { id: 2, name: 'La Filé Bovino', price: 25.00, image: 'https://lachapa-cardapio.vercel.app/images/la-file.jpg', category: 'Burgers Artesanais', description: 'Pão brioche, 130g de filé Bovino, presunto, mussarela, molho especial e salada.' },
+    { id: 3, name: 'La Alcatra', price: 25.00, image: 'https://lachapa-cardapio.vercel.app/images/la-alcatra.jpg', category: 'Burgers Artesanais', description: 'Pão brioche, hambúrguer de Alcatra 130g, presunto, mussarela, bacon crocante, molho barbecue e salada.' },
+    { id: 4, name: 'La Cupim', price: 27.00, image: 'https://lachapa-cardapio.vercel.app/images/la-cupim.jpg', category: 'Burgers Artesanais', description: 'Pão brioche, hambúrguer de Cupim 130g, presunto, mussarela, bacon crocante, molho barbecue e salada.' },
+    { id: 5, name: 'La Picanha', price: 30.00, image: 'https://lachapa-cardapio.vercel.app/images/la-picanha.jpg', category: 'Burgers Artesanais', description: 'Pão brioche, hambúrguer de Picanha 130g, presunto, mussarela, bacon crocante, molho barbecue e salada.' },
+    { id: 6, name: 'La Costela Duplo', price: 34.00, image: 'https://lachapa-cardapio.vercel.app/images/la-costela-duplo.jpg', category: 'Burgers Artesanais', description: 'Pão brioche, 2x hambúrguer de Costela 130g, 2x queijo cheddar, molho barbecue e salada.' },
+    { id: 7, name: 'La Alcatra Duplo', price: 35.00, image: 'https://lachapa-cardapio.vercel.app/images/la-alcatra-duplo.jpg', category: 'Burgers Artesanais', description: 'Pão brioche, 2x hambúrguer de Alcatra 130g, presunto, mussarela, bacon crocante, molho barbecue e salada.' },
+    { id: 8, name: 'La Picanha Duplo', price: 40.00, image: 'https://lachapa-cardapio.vercel.app/images/la-picanha-duplo.jpg', category: 'Burgers Artesanais', description: 'Pão brioche, 2x hambúrguer de Picanha 130g, presunto, mussarela, bacon crocante, molho barbecue e salada.' },
+    
+    // Tradicionais
+    { id: 9, name: 'Bauru', price: 15.00, image: 'https://lachapa-cardapio.vercel.app/images/bauru.jpg', category: 'Tradicionais', description: 'Pão brioche, hambúrguer, ovo, queijo mussarela, presunto, alface e tomate, molho da casa.' },
+    { id: 10, name: 'Americano', price: 16.00, image: 'https://lachapa-cardapio.vercel.app/images/americano.jpg', category: 'Tradicionais', description: 'Pão brioche, hambúrguer, catupiry, ovo, queijo mussarela, presunto, alface tomate, molho da casa.' },
+    { id: 11, name: 'X-Burguer', price: 14.00, image: 'https://lachapa-cardapio.vercel.app/images/x-burguer.jpg', category: 'Tradicionais', description: 'Pão brioche, hambúrguer, queijo mussarela, presunto, alface, tomate, molho da casa.' },
+    { id: 12, name: 'X-Burguer Duplo', price: 20.00, image: 'https://lachapa-cardapio.vercel.app/images/x-burguer-duplo.jpg', category: 'Tradicionais', description: 'Pão brioche, 2 hambúrguer, queijo mussarela, presunto, alface e tomate, molho da casa.' },
+    { id: 13, name: 'X-Bacon', price: 20.00, image: 'https://lachapa-cardapio.vercel.app/images/x-bacon.jpg', category: 'Tradicionais', description: 'Pão brioche, hambúrguer, bacon crocante, queijo mussarela, presunto, alface e tomate, molho da casa.' },
+    { id: 14, name: 'X-Calabacon', price: 22.00, image: 'https://lachapa-cardapio.vercel.app/images/x-calabacon.jpg', category: 'Tradicionais', description: 'Pão brioche, hambúrguer, calabresa, bacon, queijo mussarela, presunto, alface, tomate, molho da casa.' },
+    { id: 15, name: 'X-Calabresa Egg', price: 23.00, image: 'https://lachapa-cardapio.vercel.app/images/x-calabresa-egg.jpg', category: 'Tradicionais', description: 'Pão brioche, hambúrguer, calabresa, ovo, queijo mussarela, presunto, alface, tomate, molho da casa.' },
+    { id: 16, name: 'La Calabresa', price: 20.00, image: 'https://lachapa-cardapio.vercel.app/images/la-calabresa.jpg', category: 'Tradicionais', description: 'Pão brioche, 130g de Calabresa defumada, mussarela, presunto, alface, tomate, molho da casa.' },
+    { id: 17, name: 'La Frango Desfiado', price: 23.00, image: 'https://lachapa-cardapio.vercel.app/images/la-frango.jpg', category: 'Tradicionais', description: 'Pão brioche, 130g de Frango Desfiado, catupiry, presunto, mussarela, batata palha, molho da casa e salada.' },
+    { id: 18, name: 'La Toscana', price: 22.00, image: 'https://lachapa-cardapio.vercel.app/images/la-toscana.jpg', category: 'Tradicionais', description: 'Pão brioche, hambúrguer de toscana 130g, presunto, mussarela, molho da casa e salada.' },
+    { id: 19, name: 'X-Tudo', price: 28.00, image: 'https://lachapa-cardapio.vercel.app/images/x-tudo.jpg', category: 'Tradicionais', description: 'Pão brioche, hambúrguer, ovo, calabresa bacon, queijo mussarela presunto, cheddar, frango desfiado batata palha, catupiry, molho da casa.' },
+    
+    // Passaportes
+    { id: 20, name: 'Passaporte de Frango', price: 16.00, image: 'https://lachapa-cardapio.vercel.app/images/passaporte-frango.jpg', category: 'Passaportes', description: 'Pão seda, 2 salsichas, frango desfiado, milho, ervilha, tomate, batata palha, queijo ralado e molho especial.' },
+    { id: 21, name: 'Passaporte de Frango c/ Catupiry', price: 19.00, image: 'https://lachapa-cardapio.vercel.app/images/passaporte-frango-catupiry.jpg', category: 'Passaportes', description: 'Pão seda, 2 salsichas, frango desfiado, Catupiry, milho, ervilha, tomate, batata palha, queijo ralado e molho especial.' },
+    { id: 22, name: 'Passaporte de Frango c/ Cheddar', price: 19.00, image: 'https://lachapa-cardapio.vercel.app/images/passaporte-frango-cheddar.jpg', category: 'Passaportes', description: 'Pão seda, 2 salsichas, frango desfiado, Cheddar, milho, ervilha, tomate, batata palha, queijo ralado e molho especial.' },
+    { id: 23, name: 'Passaporte de Frango c/ Calabresa', price: 19.00, image: 'https://lachapa-cardapio.vercel.app/images/passaporte-frango-calabresa.jpg', category: 'Passaportes', description: 'Pão seda, 2 salsichas, frango desfiado, Calabresa, milho, ervilha, tomate, batata palha, queijo ralado e molho especial.' },
+    { id: 24, name: 'Passaporte de Frango c/ Bacon', price: 20.00, image: 'https://lachapa-cardapio.vercel.app/images/passaporte-frango-bacon.jpg', category: 'Passaportes', description: 'Pão seda, 2 salsichas, frango desfiado, Bacon, milho, ervilha, tomate, batata palha, queijo ralado e molho especial.' },
+    { id: 25, name: 'Passaporte de Toscana', price: 21.00, image: 'https://lachapa-cardapio.vercel.app/images/passaporte-toscana.jpg', category: 'Passaportes', description: 'Pão seda, 2 salsichas, linguiça toscana, milho, ervilha, tomate, batata palha, queijo ralado e molho especial.' },
+    { id: 26, name: 'Passaporte de Carne', price: 20.00, image: 'https://lachapa-cardapio.vercel.app/images/passaporte-carne.jpg', category: 'Passaportes', description: 'Pão seda, 2 salsichas, carne moída, milho, ervilha, tomate, batata palha, queijo ralado e molho especial.' },
+    { id: 27, name: 'Passaporte de Carne c/ Catupiry', price: 22.00, image: 'https://lachapa-cardapio.vercel.app/images/passaporte-carne-catupiry.jpg', category: 'Passaportes', description: 'Pão seda, 2 salsichas, carne moída, catupiry, milho, ervilha, tomate, batata palha, queijo ralado e molho especial.' },
+    { id: 28, name: 'Passaporte de Carne c/ Cheddar', price: 22.00, image: 'https://lachapa-cardapio.vercel.app/images/passaporte-carne-cheddar.jpg', category: 'Passaportes', description: 'Pão seda, 2 salsichas, carne moída, Cheddar, milho, ervilha, tomate, batata palha, queijo ralado e molho especial.' },
+    { id: 29, name: 'Passaporte de Carne de Sol', price: 28.00, image: 'https://lachapa-cardapio.vercel.app/images/passaporte-carne-sol.jpg', category: 'Passaportes', description: 'Pão seda, 2 salsichas, carne de sol desfiada, milho, ervilha, tomate, batata palha, queijo ralado e molho especial.' },
+    { id: 30, name: 'Passaporte de Filé Bovino', price: 23.00, image: 'https://lachapa-cardapio.vercel.app/images/passaporte-file.jpg', category: 'Passaportes', description: 'Pão seda, 2 salsichas, filé bovino, milho, ervilha, tomate, batata palha, queijo ralado e molho especial.' },
+    
+    // Bebidas
+    { id: 31, name: 'Coca-cola lata', price: 5.50, image: 'https://lachapa-cardapio.vercel.app/images/coca-lata.jpg', category: 'Bebidas', description: 'Refrigerante Coca-cola lata 350ml' },
+    { id: 32, name: 'Coca-cola Zero lata', price: 5.50, image: 'https://lachapa-cardapio.vercel.app/images/coca-zero-lata.jpg', category: 'Bebidas', description: 'Refrigerante Coca-cola Zero lata 350ml' },
+    { id: 33, name: 'Guaraná lata', price: 5.00, image: 'https://lachapa-cardapio.vercel.app/images/guarana-lata.jpg', category: 'Bebidas', description: 'Refrigerante Guaraná lata 350ml' },
+    { id: 34, name: 'Guarana Zero lata', price: 5.50, image: 'https://lachapa-cardapio.vercel.app/images/guarana-zero-lata.jpg', category: 'Bebidas', description: 'Refrigerante Guarana Zero lata 350ml' },
+    { id: 35, name: 'Fanta lata', price: 5.00, image: 'https://lachapa-cardapio.vercel.app/images/fanta-lata.jpg', category: 'Bebidas', description: 'Refrigerante Fanta lata 350ml' },
+    { id: 36, name: 'Água mineral', price: 3.00, image: 'https://lachapa-cardapio.vercel.app/images/agua.jpg', category: 'Bebidas', description: 'Água mineral sem gás 500ml' },
+    { id: 37, name: 'Água mineral c/ gás', price: 3.00, image: 'https://lachapa-cardapio.vercel.app/images/agua-gas.jpg', category: 'Bebidas', description: 'Água mineral com gás 500ml' },
+    { id: 38, name: 'Guaraná 1 litro', price: 8.00, image: 'https://lachapa-cardapio.vercel.app/images/guarana-1l.jpg', category: 'Bebidas', description: 'Refrigerante Guaraná 1 litro' },
+    { id: 39, name: 'Guaraná 2 litros', price: 12.00, image: 'https://lachapa-cardapio.vercel.app/images/guarana-2l.jpg', category: 'Bebidas', description: 'Refrigerante Guaraná 2 litros' },
+    { id: 40, name: 'Coca-cola 1 litro', price: 10.00, image: 'https://lachapa-cardapio.vercel.app/images/coca-1l.jpg', category: 'Bebidas', description: 'Refrigerante Coca-cola 1 litro' },
+    { id: 41, name: 'Coca-cola 2 litros', price: 14.00, image: 'https://lachapa-cardapio.vercel.app/images/coca-2l.jpg', category: 'Bebidas', description: 'Refrigerante Coca-cola 2 litros' },
+    { id: 42, name: 'Fanta 1 litro', price: 8.00, image: 'https://lachapa-cardapio.vercel.app/images/fanta-1l.jpg', category: 'Bebidas', description: 'Refrigerante Fanta 1 litro' }
   ];
 
   // Filtragem de produtos
-  const filteredProducts = products.filter(product => {
-    const matchesCategory = activeCategory === 'all' || product.category === activeCategory;
-    const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesCategory && matchesSearch;
-  });
+  const filteredProducts = useMemo(() => {
+    return products.filter(product => {
+      const matchesCategory = activeCategory === 'all' || product.category === activeCategory;
+      const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase());
+      return matchesCategory && matchesSearch;
+    });
+  }, [activeCategory, searchTerm]);
 
   // Cálculos do pedido
   const subtotal = orderItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  const tax = subtotal * 0.05; // 5% de taxa
+  const tax = 0; // Removido taxa de serviço por padrão
   const total = subtotal + tax;
 
   // Handlers
@@ -95,12 +136,10 @@ const PDV: React.FC = () => {
     );
     
     if (existingItemIndex >= 0) {
-      // Atualizar item existente
       const updatedItems = [...orderItems];
       updatedItems[existingItemIndex].quantity += productQuantity;
       setOrderItems(updatedItems);
     } else {
-      // Adicionar novo item
       const newItem: OrderItem = {
         id: Date.now(),
         productId: selectedProduct.id,
@@ -128,63 +167,73 @@ const PDV: React.FC = () => {
   };
 
   const handleFinishOrder = () => {
-    // Aqui seria a integração com a impressora e backend
     alert(`Pedido finalizado! Total: R$ ${total.toFixed(2)}`);
     setOrderItems([]);
     setSelectedCustomer(null);
     setPaymentMethod('');
-    setNotes('');
+    // setNotes('');
   };
 
   return (
     <div className="pdv-container">
-      <Sidebar />
+      <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
       
       <div className="pdv-content">
-        <Header title="PDV - Registro de Pedidos" />
+        <Header 
+          title="PDV LaChapa" 
+          onMenuClick={() => setIsSidebarOpen(true)}
+        />
         
-        <div className="pdv-grid">
+        <div className="pdv-main-layout">
           {/* Coluna esquerda - Produtos */}
-          <div className="pdv-products-column">
-            {/* Busca de produtos */}
-            <div className="pdv-search">
-              <input 
-                type="text" 
-                placeholder="Buscar produto..." 
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-              <button><i className="bi bi-search"></i></button>
+          <div className="pdv-products-section">
+            <div className="pdv-controls">
+              <div className="pdv-search-bar">
+                <i className="bi bi-search"></i>
+                <input 
+                  type="text" 
+                  placeholder="Buscar produto pelo nome..." 
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+              
+              <div className="pdv-categories-scroll">
+                {categories.map(category => (
+                  <button 
+                    key={category.id}
+                    className={`category-chip ${activeCategory === category.id ? 'active' : ''}`}
+                    onClick={() => setActiveCategory(category.id)}
+                  >
+                    <i className={`bi ${category.icon}`}></i>
+                    <span>{category.name}</span>
+                  </button>
+                ))}
+              </div>
             </div>
             
-            {/* Categorias */}
-            <div className="pdv-categories">
-              {categories.map(category => (
-                <button 
-                  key={category.id}
-                  className={`category-btn ${activeCategory === category.id ? 'active' : ''}`}
-                  onClick={() => setActiveCategory(category.id)}
-                >
-                  <i className={`bi ${category.icon}`}></i>
-                  <span>{category.name}</span>
-                </button>
-              ))}
-            </div>
-            
-            {/* Lista de produtos */}
             <div className="pdv-products-grid">
               {filteredProducts.map(product => (
                 <div 
                   key={product.id} 
-                  className="product-card"
+                  className="product-card-modern"
                   onClick={() => handleProductClick(product)}
                 >
-                  <div className="product-image">
-                    <img src={product.image} alt={product.name} />
+                  <div className="product-card-image">
+                    <img src={product.image} alt={product.name} onError={(e) => {
+                      (e.target as HTMLImageElement).src = 'https://via.placeholder.com/150?text=LaChapa';
+                    }} />
+                    <div className="product-card-category">{product.category}</div>
                   </div>
-                  <div className="product-info">
+                  <div className="product-card-details">
                     <h3>{product.name}</h3>
-                    <p className="product-price">R$ {product.price.toFixed(2)}</p>
+                    <p className="product-card-desc">{product.description?.substring(0, 60)}...</p>
+                    <div className="product-card-footer">
+                      <span className="product-card-price">R$ {product.price.toFixed(2)}</span>
+                      <button className="product-card-add">
+                        <i className="bi bi-plus"></i>
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -192,196 +241,172 @@ const PDV: React.FC = () => {
           </div>
           
           {/* Coluna direita - Pedido atual */}
-          <div className="pdv-order-column">
-            <div className="order-header">
-              <h2>Pedido Atual</h2>
-              <button className="btn-clear" onClick={() => setOrderItems([])}>
-                <i className="bi bi-trash"></i> Limpar
-              </button>
-            </div>
-            
-            {/* Cliente */}
-            <div className="order-customer">
-              <h3>Cliente</h3>
-              {selectedCustomer ? (
-                <div className="selected-customer">
-                  <div>
-                    <p><strong>{selectedCustomer.name}</strong></p>
-                    <p>{selectedCustomer.phone}</p>
+          <div className="pdv-order-section">
+            <div className="order-card">
+              <div className="order-card-header">
+                <div>
+                  <h2>Pedido Atual</h2>
+                  <span className="order-items-count">{orderItems.length} itens</span>
+                </div>
+                <button className="btn-icon-clear" onClick={() => setOrderItems([])} title="Limpar Pedido">
+                  <i className="bi bi-trash3"></i>
+                </button>
+              </div>
+              
+              <div className="order-card-body">
+                {/* Cliente */}
+                <div className="order-section-block">
+                  <div className="section-title">
+                    <i className="bi bi-person"></i>
+                    <span>Cliente</span>
                   </div>
-                  <button onClick={() => setSelectedCustomer(null)}>
-                    <i className="bi bi-x-circle"></i>
-                  </button>
-                </div>
-              ) : (
-                <button className="btn-select-customer">
-                  <i className="bi bi-person-plus"></i> Selecionar Cliente
-                </button>
-              )}
-            </div>
-            
-            {/* Itens do pedido */}
-            <div className="order-items">
-              <h3>Itens</h3>
-              {orderItems.length === 0 ? (
-                <div className="empty-order">
-                  <i className="bi bi-cart"></i>
-                  <p>Nenhum item adicionado</p>
-                </div>
-              ) : (
-                <ul className="order-items-list">
-                  {orderItems.map(item => (
-                    <li key={item.id} className="order-item">
-                      <div className="item-info">
-                        <h4>{item.name}</h4>
-                        {item.notes && <p className="item-notes">{item.notes}</p>}
-                        <p className="item-price">R$ {item.price.toFixed(2)}</p>
+                  {selectedCustomer ? (
+                    <div className="customer-info-box">
+                      <div className="customer-details">
+                        <p className="customer-name">{selectedCustomer.name}</p>
+                        <p className="customer-phone">{selectedCustomer.phone}</p>
                       </div>
-                      <div className="item-actions">
-                        <div className="quantity-control">
-                          <button onClick={() => handleUpdateQuantity(item.id, item.quantity - 1)}>-</button>
-                          <span>{item.quantity}</span>
-                          <button onClick={() => handleUpdateQuantity(item.id, item.quantity + 1)}>+</button>
+                      <button className="btn-remove-customer" onClick={() => setSelectedCustomer(null)}>
+                        <i className="bi bi-x"></i>
+                      </button>
+                    </div>
+                  ) : (
+                    <button className="btn-add-customer">
+                      <i className="bi bi-plus-circle"></i>
+                      <span>Vincular Cliente</span>
+                    </button>
+                  )}
+                </div>
+                
+                {/* Itens do pedido */}
+                <div className="order-items-container">
+                  <div className="section-title">
+                    <i className="bi bi-list-ul"></i>
+                    <span>Itens do Pedido</span>
+                  </div>
+                  {orderItems.length === 0 ? (
+                    <div className="empty-order-state">
+                      <div className="empty-icon">
+                        <i className="bi bi-cart-x"></i>
+                      </div>
+                      <p>Seu carrinho está vazio</p>
+                      <span>Selecione produtos ao lado</span>
+                    </div>
+                  ) : (
+                    <div className="order-items-scroll">
+                      {orderItems.map(item => (
+                        <div key={item.id} className="order-item-row">
+                          <div className="item-main">
+                            <div className="item-qty-badge">{item.quantity}x</div>
+                            <div className="item-text">
+                              <p className="item-name">{item.name}</p>
+                              {item.notes && <p className="item-subtext">{item.notes}</p>}
+                            </div>
+                            <div className="item-price-total">
+                              R$ {(item.price * item.quantity).toFixed(2)}
+                            </div>
+                          </div>
+                          <div className="item-controls">
+                            <div className="qty-stepper">
+                              <button onClick={() => handleUpdateQuantity(item.id, item.quantity - 1)}>-</button>
+                              <span>{item.quantity}</span>
+                              <button onClick={() => handleUpdateQuantity(item.id, item.quantity + 1)}>+</button>
+                            </div>
+                            <button className="btn-item-delete" onClick={() => handleRemoveItem(item.id)}>
+                              <i className="bi bi-trash"></i>
+                            </button>
+                          </div>
                         </div>
-                        <p className="item-subtotal">R$ {(item.price * item.quantity).toFixed(2)}</p>
-                        <button className="btn-remove" onClick={() => handleRemoveItem(item.id)}>
-                          <i className="bi bi-x"></i>
-                        </button>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-            
-            {/* Observações */}
-            <div className="order-notes">
-              <h3>Observações</h3>
-              <textarea 
-                placeholder="Observações gerais do pedido..."
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-              ></textarea>
-            </div>
-            
-            {/* Totais */}
-            <div className="order-totals">
-              <div className="total-row">
-                <span>Subtotal</span>
-                <span>R$ {subtotal.toFixed(2)}</span>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
-              <div className="total-row">
-                <span>Taxa de serviço (5%)</span>
-                <span>R$ {tax.toFixed(2)}</span>
-              </div>
-              <div className="total-row total">
-                <span>Total</span>
-                <span>R$ {total.toFixed(2)}</span>
-              </div>
-            </div>
-            
-            {/* Pagamento */}
-            <div className="order-payment">
-              <h3>Forma de Pagamento</h3>
-              <div className="payment-options">
+              
+              <div className="order-card-footer">
+                <div className="payment-method-section">
+                  <p>Forma de Pagamento</p>
+                  <div className="payment-grid">
+                    {[
+                      { id: 'pix', label: 'PIX', icon: 'bi-qr-code' },
+                      { id: 'card', label: 'Cartão', icon: 'bi-credit-card' },
+                      { id: 'cash', label: 'Dinheiro', icon: 'bi-cash-stack' }
+                    ].map(method => (
+                      <button 
+                        key={method.id}
+                        className={`payment-btn ${paymentMethod === method.id ? 'active' : ''}`}
+                        onClick={() => setPaymentMethod(method.id)}
+                      >
+                        <i className={`bi ${method.icon}`}></i>
+                        <span>{method.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="order-summary">
+                  <div className="summary-row">
+                    <span>Subtotal</span>
+                    <span>R$ {subtotal.toFixed(2)}</span>
+                  </div>
+                  <div className="summary-row total">
+                    <span>Total a Pagar</span>
+                    <span>R$ {total.toFixed(2)}</span>
+                  </div>
+                </div>
+                
                 <button 
-                  className={`payment-option ${paymentMethod === 'cash' ? 'active' : ''}`}
-                  onClick={() => setPaymentMethod('cash')}
+                  className="btn-checkout" 
+                  disabled={orderItems.length === 0 || !paymentMethod}
+                  onClick={handleFinishOrder}
                 >
-                  <i className="bi bi-cash"></i>
-                  <span>Dinheiro</span>
-                </button>
-                <button 
-                  className={`payment-option ${paymentMethod === 'credit' ? 'active' : ''}`}
-                  onClick={() => setPaymentMethod('credit')}
-                >
-                  <i className="bi bi-credit-card"></i>
-                  <span>Crédito</span>
-                </button>
-                <button 
-                  className={`payment-option ${paymentMethod === 'debit' ? 'active' : ''}`}
-                  onClick={() => setPaymentMethod('debit')}
-                >
-                  <i className="bi bi-credit-card-2-front"></i>
-                  <span>Débito</span>
-                </button>
-                <button 
-                  className={`payment-option ${paymentMethod === 'pix' ? 'active' : ''}`}
-                  onClick={() => setPaymentMethod('pix')}
-                >
-                  <i className="bi bi-qr-code"></i>
-                  <span>PIX</span>
+                  <i className="bi bi-check2-circle"></i>
+                  <span>Finalizar Pedido</span>
                 </button>
               </div>
-            </div>
-            
-            {/* Botões de ação */}
-            <div className="order-actions">
-              <button className="btn-save">
-                <i className="bi bi-save"></i> Salvar Pedido
-              </button>
-              <button 
-                className="btn-finish"
-                disabled={orderItems.length === 0 || !paymentMethod}
-                onClick={handleFinishOrder}
-              >
-                <i className="bi bi-check-circle"></i> Finalizar e Imprimir
-              </button>
             </div>
           </div>
         </div>
       </div>
-      
-      {/* Modal de adição de produto */}
+
+      {/* Modal de Produto */}
       {showProductModal && selectedProduct && (
-        <div className="product-modal-overlay">
-          <div className="product-modal">
-            <div className="modal-header">
-              <h2>Adicionar Item</h2>
-              <button onClick={() => setShowProductModal(false)}>
+        <div className="modern-modal-overlay">
+          <div className="modern-modal animate-slide-up">
+            <div className="modal-banner">
+              <img src={selectedProduct.image} alt={selectedProduct.name} onError={(e) => {
+                (e.target as HTMLImageElement).src = 'https://via.placeholder.com/400x200?text=LaChapa';
+              }} />
+              <button className="modal-close-btn" onClick={() => setShowProductModal(false)}>
                 <i className="bi bi-x-lg"></i>
               </button>
             </div>
-            
-            <div className="modal-body">
-              <div className="product-details">
-                <img src={selectedProduct.image} alt={selectedProduct.name} />
-                <div>
-                  <h3>{selectedProduct.name}</h3>
-                  <p className="product-price">R$ {selectedProduct.price.toFixed(2)}</p>
-                </div>
+            <div className="modal-content">
+              <div className="modal-product-info">
+                <h2>{selectedProduct.name}</h2>
+                <p className="modal-product-price">R$ {selectedProduct.price.toFixed(2)}</p>
+                <p className="modal-product-desc">{selectedProduct.description}</p>
               </div>
               
-              <div className="product-quantity">
-                <h4>Quantidade</h4>
-                <div className="quantity-control">
-                  <button 
-                    onClick={() => setProductQuantity(prev => Math.max(1, prev - 1))}
-                  >-</button>
-                  <span>{productQuantity}</span>
-                  <button 
-                    onClick={() => setProductQuantity(prev => prev + 1)}
-                  >+</button>
-                </div>
-              </div>
-              
-              <div className="product-notes">
-                <h4>Observações</h4>
+              <div className="modal-form-group">
+                <label>Observações do Item</label>
                 <textarea 
-                  placeholder="Ex: Sem cebola, molho à parte..."
+                  placeholder="Ex: Sem cebola, ponto da carne mal passado..."
                   value={productNotes}
                   onChange={(e) => setProductNotes(e.target.value)}
                 ></textarea>
               </div>
-            </div>
-            
-            <div className="modal-footer">
-              <button className="btn-cancel" onClick={() => setShowProductModal(false)}>
-                Cancelar
-              </button>
-              <button className="btn-add" onClick={handleAddToOrder}>
-                Adicionar - R$ {(selectedProduct.price * productQuantity).toFixed(2)}
-              </button>
+              
+              <div className="modal-footer">
+                <div className="modal-qty-selector">
+                  <button onClick={() => setProductQuantity(Math.max(1, productQuantity - 1))}>-</button>
+                  <span>{productQuantity}</span>
+                  <button onClick={() => setProductQuantity(productQuantity + 1)}>+</button>
+                </div>
+                <button className="btn-modal-add" onClick={handleAddToOrder}>
+                  Adicionar ao Pedido • R$ {(selectedProduct.price * productQuantity).toFixed(2)}
+                </button>
+              </div>
             </div>
           </div>
         </div>
