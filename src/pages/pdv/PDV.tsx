@@ -3,7 +3,7 @@ import './PDV.css';
 import '../../styles/theme.css';
 import Sidebar from '../../components/common/Sidebar';
 import Header from '../../components/common/Header';
-import { X, Plus, Minus, Trash2, ShoppingCart } from 'lucide-react';
+import { X, Plus, Minus, Trash2, ShoppingCart, Menu } from 'lucide-react';
 
 // Tipos
 interface Product {
@@ -137,11 +137,21 @@ const PDV: React.FC = () => {
     { id: 30, name: 'Passaporte de Filé Bovino', price: 23.00, image: 'https://lachapa-cardapio.vercel.app/images/passaporte-file.jpg', category: 'Passaportes', description: 'Pão seda, 2 salsichas, filé bovino, milho, ervilha, tomate, batata palha, queijo ralado e molho especial.' },
     
     // Bebidas
-    { id: 31, name: 'Refrigerante 2L', price: 8.00, image: 'https://lachapa-cardapio.vercel.app/images/refrigerante.jpg', category: 'Bebidas', description: 'Refrigerante gelado 2 litros.' },
-    { id: 32, name: 'Suco Natural', price: 5.00, image: 'https://lachapa-cardapio.vercel.app/images/suco.jpg', category: 'Bebidas', description: 'Suco natural fresco.' },
+    { id: 31, name: 'Coca-cola lata', price: 5.50, image: 'https://lachapa-cardapio.vercel.app/images/coca-lata.jpg', category: 'Bebidas', description: 'Refrigerante Coca-cola lata 350ml' },
+    { id: 32, name: 'Coca-cola Zero lata', price: 5.50, image: 'https://lachapa-cardapio.vercel.app/images/coca-zero-lata.jpg', category: 'Bebidas', description: 'Refrigerante Coca-cola Zero lata 350ml' },
+    { id: 33, name: 'Guaraná lata', price: 5.00, image: 'https://lachapa-cardapio.vercel.app/images/guarana-lata.jpg', category: 'Bebidas', description: 'Refrigerante Guaraná lata 350ml' },
+    { id: 34, name: 'Guarana Zero lata', price: 5.50, image: 'https://lachapa-cardapio.vercel.app/images/guarana-zero-lata.jpg', category: 'Bebidas', description: 'Refrigerante Guarana Zero lata 350ml' },
+    { id: 35, name: 'Fanta lata', price: 5.00, image: 'https://lachapa-cardapio.vercel.app/images/fanta-lata.jpg', category: 'Bebidas', description: 'Refrigerante Fanta lata 350ml' },
+    { id: 36, name: 'Água mineral', price: 3.00, image: 'https://lachapa-cardapio.vercel.app/images/agua.jpg', category: 'Bebidas', description: 'Água mineral sem gás 500ml' },
+    { id: 37, name: 'Água mineral c/ gás', price: 3.00, image: 'https://lachapa-cardapio.vercel.app/images/agua-gas.jpg', category: 'Bebidas', description: 'Água mineral com gás 500ml' },
+    { id: 38, name: 'Guaraná 1 litro', price: 8.00, image: 'https://lachapa-cardapio.vercel.app/images/guarana-1l.jpg', category: 'Bebidas', description: 'Refrigerante Guaraná 1 litro' },
+    { id: 39, name: 'Guaraná 2 litros', price: 12.00, image: 'https://lachapa-cardapio.vercel.app/images/guarana-2l.jpg', category: 'Bebidas', description: 'Refrigerante Guaraná 2 litros' },
+    { id: 40, name: 'Coca-cola 1 litro', price: 10.00, image: 'https://lachapa-cardapio.vercel.app/images/coca-1l.jpg', category: 'Bebidas', description: 'Refrigerante Coca-cola 1 litro' },
+    { id: 41, name: 'Coca-cola 2 litros', price: 14.00, image: 'https://lachapa-cardapio.vercel.app/images/coca-2l.jpg', category: 'Bebidas', description: 'Refrigerante Coca-cola 2 litros' },
+    { id: 42, name: 'Fanta 1 litro', price: 8.00, image: 'https://lachapa-cardapio.vercel.app/images/fanta-1l.jpg', category: 'Bebidas', description: 'Refrigerante Fanta 1 litro' }
   ];
 
-  // Filtrar produtos
+  // Filtragem de produtos
   const filteredProducts = useMemo(() => {
     return products.filter(product => {
       const matchesCategory = product.category === activeCategory;
@@ -211,8 +221,6 @@ const PDV: React.FC = () => {
       return;
     }
 
-    // Aqui você faria o upload da imagem para o servidor
-    // Por enquanto, vamos simular
     const newProduct: Product = {
       id: Date.now(),
       name: newItemData.name,
@@ -222,7 +230,6 @@ const PDV: React.FC = () => {
       image: URL.createObjectURL(newItemData.image),
     };
 
-    // Aqui você faria a chamada à API para salvar o produto
     console.log('Novo produto criado:', newProduct);
     
     setShowNewItemModal(false);
@@ -252,9 +259,26 @@ const PDV: React.FC = () => {
 
   return (
     <div className="pdv-container">
-      <Sidebar isOpen={isSidebarOpen} />
+      {/* Sidebar Retrátil */}
+      <div className={`pdv-sidebar-wrapper ${isSidebarOpen ? 'open' : ''}`}>
+        <Sidebar isOpen={isSidebarOpen} />
+        {isSidebarOpen && (
+          <div className="pdv-sidebar-overlay" onClick={() => setIsSidebarOpen(false)} />
+        )}
+      </div>
+
       <div className="pdv-content">
-        <Header onMenuClick={() => setIsSidebarOpen(!isSidebarOpen)} />
+        {/* Header com Botão Hambúrguer */}
+        <div className="pdv-header-wrapper">
+          <button 
+            className="pdv-hamburger-btn" 
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            title="Abrir/Fechar Menu"
+          >
+            <Menu size={24} />
+          </button>
+          <Header onMenuClick={() => setIsSidebarOpen(!isSidebarOpen)} />
+        </div>
         
         <div className="pdv-main-layout">
           {/* Seção de Produtos */}
@@ -270,7 +294,7 @@ const PDV: React.FC = () => {
                 />
               </div>
 
-              <div style={{ display: 'flex', gap: '10px', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div className="pdv-categories-container">
                 <div className="pdv-categories-scroll">
                   {categories.map(category => (
                     <button
@@ -290,8 +314,8 @@ const PDV: React.FC = () => {
                   onClick={() => setShowNewItemModal(true)}
                   title="Criar novo item no cardápio"
                 >
-                  <Plus size={18} />
-                  Novo Item
+                  <Plus size={16} />
+                  Novo
                 </button>
               </div>
             </div>
@@ -313,7 +337,7 @@ const PDV: React.FC = () => {
                         className="product-card-add"
                         onClick={() => handleAddProduct(product)}
                       >
-                        <Plus size={18} />
+                        <Plus size={16} />
                       </button>
                     </div>
                   </div>
@@ -335,7 +359,7 @@ const PDV: React.FC = () => {
                   onClick={() => setOrderItems([])}
                   disabled={orderItems.length === 0}
                 >
-                  <Trash2 size={20} />
+                  <Trash2 size={18} />
                 </button>
               </div>
 
@@ -356,12 +380,12 @@ const PDV: React.FC = () => {
                         className="btn-icon-clear"
                         onClick={() => setSelectedCustomer(null)}
                       >
-                        <X size={18} />
+                        <X size={16} />
                       </button>
                     </div>
                   ) : (
                     <button className="btn-add-customer">
-                      <Plus size={18} />
+                      <Plus size={16} />
                       Adicionar Cliente
                     </button>
                   )}
@@ -376,7 +400,7 @@ const PDV: React.FC = () => {
                   {orderItems.length === 0 ? (
                     <div className="empty-order-state">
                       <div className="empty-icon">
-                        <ShoppingCart size={48} />
+                        <ShoppingCart size={40} />
                       </div>
                       <p>Nenhum item adicionado</p>
                     </div>
@@ -394,9 +418,9 @@ const PDV: React.FC = () => {
                           </div>
 
                           {item.extras.length > 0 && (
-                            <div style={{ paddingLeft: '28px', fontSize: '0.8rem', color: '#94a3b8', marginBottom: '8px' }}>
+                            <div className="item-extras">
                               {item.extras.map(extra => (
-                                <div key={extra.id}>
+                                <div key={extra.id} className="extra-badge">
                                   + {extra.quantity}x {extra.name}
                                 </div>
                               ))}
@@ -406,18 +430,18 @@ const PDV: React.FC = () => {
                           <div className="item-controls">
                             <div className="qty-stepper">
                               <button onClick={() => handleUpdateQuantity(item.id, item.quantity - 1)}>
-                                <Minus size={14} />
+                                <Minus size={12} />
                               </button>
                               <span>{item.quantity}</span>
                               <button onClick={() => handleUpdateQuantity(item.id, item.quantity + 1)}>
-                                <Plus size={14} />
+                                <Plus size={12} />
                               </button>
                             </div>
                             <button
                               className="btn-item-delete"
                               onClick={() => handleRemoveOrderItem(item.id)}
                             >
-                              <Trash2 size={16} />
+                              <Trash2 size={14} />
                             </button>
                           </div>
                         </div>
@@ -430,7 +454,7 @@ const PDV: React.FC = () => {
               {/* Footer */}
               <div className="order-card-footer">
                 <div className="payment-method-section">
-                  <p>Método de Pagamento</p>
+                  <p>Forma de Pagamento</p>
                   <div className="payment-grid">
                     {['Dinheiro', 'Débito', 'Crédito'].map(method => (
                       <button
@@ -450,7 +474,7 @@ const PDV: React.FC = () => {
                 </div>
 
                 <button className="btn-confirm-order">
-                  <ShoppingCart size={18} />
+                  <ShoppingCart size={16} />
                   Confirmar Pedido
                 </button>
               </div>
@@ -469,7 +493,7 @@ const PDV: React.FC = () => {
                 className="modal-close"
                 onClick={() => setShowProductModal(false)}
               >
-                <X size={24} />
+                <X size={20} />
               </button>
             </div>
 
@@ -482,11 +506,11 @@ const PDV: React.FC = () => {
                 <label>Quantidade</label>
                 <div className="qty-stepper-large">
                   <button onClick={() => setProductQuantity(Math.max(1, productQuantity - 1))}>
-                    <Minus size={20} />
+                    <Minus size={18} />
                   </button>
                   <span>{productQuantity}</span>
                   <button onClick={() => setProductQuantity(productQuantity + 1)}>
-                    <Plus size={20} />
+                    <Plus size={18} />
                   </button>
                 </div>
               </div>
@@ -509,39 +533,21 @@ const PDV: React.FC = () => {
                   <div className="extras-list">
                     {extrasAvailable[selectedProduct.category].map(extra => (
                       <div key={extra.id} className="extra-item">
-                        <div>
-                          <p className="extra-name">{extra.name}</p>
-                          <p className="extra-price">R$ {extra.price.toFixed(2)}</p>
-                        </div>
-                        {productExtras.find(e => e.id === extra.id) ? (
-                          <div className="qty-stepper-small">
-                            <button
-                              onClick={() => {
-                                const current = productExtras.find(e => e.id === extra.id);
-                                if (current && current.quantity > 1) {
-                                  setProductExtras(productExtras.map(e =>
-                                    e.id === extra.id ? { ...e, quantity: e.quantity - 1 } : e
-                                  ));
-                                } else {
-                                  handleRemoveExtra(extra.id);
-                                }
-                              }}
-                            >
-                              <Minus size={16} />
-                            </button>
-                            <span>{productExtras.find(e => e.id === extra.id)?.quantity}</span>
-                            <button onClick={() => handleAddExtra(extra)}>
-                              <Plus size={16} />
-                            </button>
-                          </div>
-                        ) : (
-                          <button
-                            className="btn-add-extra"
-                            onClick={() => handleAddExtra(extra)}
-                          >
-                            <Plus size={16} />
-                          </button>
-                        )}
+                        <label className="extra-checkbox">
+                          <input
+                            type="checkbox"
+                            checked={!!productExtras.find(e => e.id === extra.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                handleAddExtra(extra);
+                              } else {
+                                handleRemoveExtra(extra.id);
+                              }
+                            }}
+                          />
+                          <span className="extra-name">{extra.name}</span>
+                        </label>
+                        <span className="extra-price">R$ {extra.price.toFixed(2)}</span>
                       </div>
                     ))}
                   </div>
@@ -577,7 +583,7 @@ const PDV: React.FC = () => {
                 className="modal-close"
                 onClick={() => setShowNewItemModal(false)}
               >
-                <X size={24} />
+                <X size={20} />
               </button>
             </div>
 
@@ -643,7 +649,7 @@ const PDV: React.FC = () => {
                         className="btn-remove-image"
                         onClick={() => setNewItemData({ ...newItemData, image: null })}
                       >
-                        <X size={20} />
+                        <X size={16} />
                       </button>
                     </div>
                   ) : (
@@ -655,7 +661,7 @@ const PDV: React.FC = () => {
                         style={{ display: 'none' }}
                       />
                       <div className="upload-placeholder">
-                        <Plus size={32} />
+                        <Plus size={28} />
                         <p>Clique para adicionar imagem</p>
                       </div>
                     </label>
