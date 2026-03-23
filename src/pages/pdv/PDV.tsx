@@ -277,7 +277,7 @@ const PDV: React.FC = () => {
           >
             <Menu size={24} />
           </button>
-          <Header onMenuClick={() => setIsSidebarOpen(!isSidebarOpen)} />
+          <Header onMenuClick={() => setIsSidebarOpen(!isSidebarOpen)} title="PDV" />
         </div>
         
         <div className="pdv-main-layout">
