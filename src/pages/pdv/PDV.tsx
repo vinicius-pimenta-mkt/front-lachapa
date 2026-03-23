@@ -4,6 +4,7 @@ import '../../styles/theme.css';
 import Sidebar from '../../components/common/Sidebar';
 import Header from '../../components/common/Header';
 import { X, Plus, Minus, Trash2, ShoppingCart, Menu } from 'lucide-react';
+import { createPedido } from '../../config/api';
 
 // Tipos
 interface Product {
@@ -58,6 +59,7 @@ const PDV: React.FC = () => {
   const [productNotes, setProductNotes] = useState<string>('');
   const [productExtras, setProductExtras] = useState<OrderItemExtra[]>([]);
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [showNewItemModal, setShowNewItemModal] = useState<boolean>(false);
   const [newItemData, setNewItemData] = useState({
     name: '',
@@ -248,6 +250,47 @@ const PDV: React.FC = () => {
         ...newItemData,
         image: e.target.files[0],
       });
+    }
+  };
+
+
+  const handleConfirmOrder = async () => {
+    if (orderItems.length === 0) {
+      alert('Adicione itens ao pedido');
+      return;
+    }
+    if (!paymentMethod) {
+      alert('Selecione uma forma de pagamento');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const pedido = {
+        cliente_nome: selectedCustomer?.name || 'Cliente Balcão',
+        cliente_telefone: selectedCustomer?.phone || '',
+        endereco_entrega: selectedCustomer?.address || '',
+        valor_total: totalPrice,
+        metodo_pagamento: paymentMethod,
+        origem: 'pdv',
+        observacoes: '',
+        itens: orderItems.map(item => ({
+          produto_nome: item.name,
+          quantidade: item.quantity,
+          valor_unitario: item.price,
+          observacoes: item.notes || (item.extras.length > 0 ? item.extras.map(e => `${e.quantity}x ${e.name}`).join(', ') : ''),
+        })),
+      };
+
+      await createPedido(pedido);
+      alert('Pedido criado com sucesso!');
+      setOrderItems([]);
+      setSelectedCustomer(null);
+      setPaymentMethod('');
+    } catch (err: any) {
+      alert(`Erro ao criar pedido: ${err.message}`);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -456,7 +499,7 @@ const PDV: React.FC = () => {
                 <div className="payment-method-section">
                   <p>Forma de Pagamento</p>
                   <div className="payment-grid">
-                    {['Dinheiro', 'Débito', 'Crédito'].map(method => (
+                    {['Dinheiro', 'Débito', 'Crédito', 'Pix'].map(method => (
                       <button
                         key={method}
                         className={`payment-btn ${paymentMethod === method ? 'active' : ''}`}
@@ -473,9 +516,9 @@ const PDV: React.FC = () => {
                   <span className="total-value">R$ {totalPrice.toFixed(2)}</span>
                 </div>
 
-                <button className="btn-confirm-order">
+                <button className="btn-confirm-order" onClick={handleConfirmOrder} disabled={isSubmitting || orderItems.length === 0}>
                   <ShoppingCart size={16} />
-                  Confirmar Pedido
+                  {isSubmitting ? "Enviando..." : "Confirmar Pedido"}
                 </button>
               </div>
             </div>
