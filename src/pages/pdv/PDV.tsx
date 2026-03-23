@@ -58,6 +58,14 @@ const PDV: React.FC = () => {
   const [productNotes, setProductNotes] = useState<string>('');
   const [productExtras, setProductExtras] = useState<OrderItemExtra[]>([]);
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
+  const [showNewItemModal, setShowNewItemModal] = useState<boolean>(false);
+  const [newItemData, setNewItemData] = useState({
+    name: '',
+    price: '',
+    category: 'Tradicionais',
+    description: '',
+    image: null as File | null,
+  });
 
   // Categorias ordenadas
   const categories = [
@@ -129,21 +137,11 @@ const PDV: React.FC = () => {
     { id: 30, name: 'Passaporte de Filé Bovino', price: 23.00, image: 'https://lachapa-cardapio.vercel.app/images/passaporte-file.jpg', category: 'Passaportes', description: 'Pão seda, 2 salsichas, filé bovino, milho, ervilha, tomate, batata palha, queijo ralado e molho especial.' },
     
     // Bebidas
-    { id: 31, name: 'Coca-cola lata', price: 5.50, image: 'https://lachapa-cardapio.vercel.app/images/coca-lata.jpg', category: 'Bebidas', description: 'Refrigerante Coca-cola lata 350ml' },
-    { id: 32, name: 'Coca-cola Zero lata', price: 5.50, image: 'https://lachapa-cardapio.vercel.app/images/coca-zero-lata.jpg', category: 'Bebidas', description: 'Refrigerante Coca-cola Zero lata 350ml' },
-    { id: 33, name: 'Guaraná lata', price: 5.00, image: 'https://lachapa-cardapio.vercel.app/images/guarana-lata.jpg', category: 'Bebidas', description: 'Refrigerante Guaraná lata 350ml' },
-    { id: 34, name: 'Guarana Zero lata', price: 5.50, image: 'https://lachapa-cardapio.vercel.app/images/guarana-zero-lata.jpg', category: 'Bebidas', description: 'Refrigerante Guarana Zero lata 350ml' },
-    { id: 35, name: 'Fanta lata', price: 5.00, image: 'https://lachapa-cardapio.vercel.app/images/fanta-lata.jpg', category: 'Bebidas', description: 'Refrigerante Fanta lata 350ml' },
-    { id: 36, name: 'Água mineral', price: 3.00, image: 'https://lachapa-cardapio.vercel.app/images/agua.jpg', category: 'Bebidas', description: 'Água mineral sem gás 500ml' },
-    { id: 37, name: 'Água mineral c/ gás', price: 3.00, image: 'https://lachapa-cardapio.vercel.app/images/agua-gas.jpg', category: 'Bebidas', description: 'Água mineral com gás 500ml' },
-    { id: 38, name: 'Guaraná 1 litro', price: 8.00, image: 'https://lachapa-cardapio.vercel.app/images/guarana-1l.jpg', category: 'Bebidas', description: 'Refrigerante Guaraná 1 litro' },
-    { id: 39, name: 'Guaraná 2 litros', price: 12.00, image: 'https://lachapa-cardapio.vercel.app/images/guarana-2l.jpg', category: 'Bebidas', description: 'Refrigerante Guaraná 2 litros' },
-    { id: 40, name: 'Coca-cola 1 litro', price: 10.00, image: 'https://lachapa-cardapio.vercel.app/images/coca-1l.jpg', category: 'Bebidas', description: 'Refrigerante Coca-cola 1 litro' },
-    { id: 41, name: 'Coca-cola 2 litros', price: 14.00, image: 'https://lachapa-cardapio.vercel.app/images/coca-2l.jpg', category: 'Bebidas', description: 'Refrigerante Coca-cola 2 litros' },
-    { id: 42, name: 'Fanta 1 litro', price: 8.00, image: 'https://lachapa-cardapio.vercel.app/images/fanta-1l.jpg', category: 'Bebidas', description: 'Refrigerante Fanta 1 litro' }
+    { id: 31, name: 'Refrigerante 2L', price: 8.00, image: 'https://lachapa-cardapio.vercel.app/images/refrigerante.jpg', category: 'Bebidas', description: 'Refrigerante gelado 2 litros.' },
+    { id: 32, name: 'Suco Natural', price: 5.00, image: 'https://lachapa-cardapio.vercel.app/images/suco.jpg', category: 'Bebidas', description: 'Suco natural fresco.' },
   ];
 
-  // Filtragem de produtos
+  // Filtrar produtos
   const filteredProducts = useMemo(() => {
     return products.filter(product => {
       const matchesCategory = product.category === activeCategory;
@@ -152,19 +150,8 @@ const PDV: React.FC = () => {
     });
   }, [activeCategory, searchTerm]);
 
-  // Cálculos do pedido
-  const calculateItemTotal = (item: OrderItem) => {
-    const basePrice = item.price * item.quantity;
-    const extrasPrice = item.extras.reduce((sum, extra) => sum + (extra.price * extra.quantity), 0);
-    return basePrice + extrasPrice;
-  };
-
-  const subtotal = orderItems.reduce((sum, item) => sum + calculateItemTotal(item), 0);
-  const tax = 0;
-  const total = subtotal + tax;
-
   // Handlers
-  const handleProductClick = (product: Product) => {
+  const handleAddProduct = (product: Product) => {
     setSelectedProduct(product);
     setProductQuantity(1);
     setProductNotes('');
@@ -172,154 +159,160 @@ const PDV: React.FC = () => {
     setShowProductModal(true);
   };
 
-  const handleAddExtraQuantity = (extraId: number) => {
-    setProductExtras(productExtras.map(extra => 
-      extra.id === extraId ? { ...extra, quantity: extra.quantity + 1 } : extra
+  const handleConfirmProduct = () => {
+    if (!selectedProduct) return;
+
+    const newOrderItem: OrderItem = {
+      id: Date.now(),
+      productId: selectedProduct.id,
+      name: selectedProduct.name,
+      price: selectedProduct.price,
+      quantity: productQuantity,
+      notes: productNotes,
+      extras: productExtras,
+    };
+
+    setOrderItems([...orderItems, newOrderItem]);
+    setShowProductModal(false);
+  };
+
+  const handleRemoveOrderItem = (itemId: number) => {
+    setOrderItems(orderItems.filter(item => item.id !== itemId));
+  };
+
+  const handleUpdateQuantity = (itemId: number, newQuantity: number) => {
+    if (newQuantity <= 0) {
+      handleRemoveOrderItem(itemId);
+      return;
+    }
+    setOrderItems(orderItems.map(item =>
+      item.id === itemId ? { ...item, quantity: newQuantity } : item
     ));
   };
 
-  const handleRemoveExtraQuantity = (extraId: number) => {
-    setProductExtras(productExtras.map(extra => 
-      extra.id === extraId && extra.quantity > 0 ? { ...extra, quantity: extra.quantity - 1 } : extra
-    ).filter(extra => extra.quantity > 0));
-  };
-
-  const handleToggleExtra = (extra: Extra) => {
+  const handleAddExtra = (extra: Extra) => {
     const existingExtra = productExtras.find(e => e.id === extra.id);
     if (existingExtra) {
-      setProductExtras(productExtras.filter(e => e.id !== extra.id));
+      setProductExtras(productExtras.map(e =>
+        e.id === extra.id ? { ...e, quantity: e.quantity + 1 } : e
+      ));
     } else {
       setProductExtras([...productExtras, { ...extra, quantity: 1 }]);
     }
   };
 
-  const handleAddToOrder = () => {
-    if (!selectedProduct) return;
-    
-    const existingItemIndex = orderItems.findIndex(item => 
-      item.productId === selectedProduct.id && 
-      item.notes === productNotes &&
-      JSON.stringify(item.extras) === JSON.stringify(productExtras)
-    );
-    
-    if (existingItemIndex >= 0) {
-      const updatedItems = [...orderItems];
-      updatedItems[existingItemIndex].quantity += productQuantity;
-      setOrderItems(updatedItems);
-    } else {
-      const newItem: OrderItem = {
-        id: Date.now(),
-        productId: selectedProduct.id,
-        name: selectedProduct.name,
-        price: selectedProduct.price,
-        quantity: productQuantity,
-        notes: productNotes,
-        extras: productExtras
-      };
-      setOrderItems([...orderItems, newItem]);
+  const handleRemoveExtra = (extraId: number) => {
+    setProductExtras(productExtras.filter(e => e.id !== extraId));
+  };
+
+  const handleCreateNewItem = async () => {
+    if (!newItemData.name || !newItemData.price || !newItemData.image) {
+      alert('Por favor, preencha todos os campos');
+      return;
     }
+
+    // Aqui você faria o upload da imagem para o servidor
+    // Por enquanto, vamos simular
+    const newProduct: Product = {
+      id: Date.now(),
+      name: newItemData.name,
+      price: parseFloat(newItemData.price),
+      category: newItemData.category,
+      description: newItemData.description,
+      image: URL.createObjectURL(newItemData.image),
+    };
+
+    // Aqui você faria a chamada à API para salvar o produto
+    console.log('Novo produto criado:', newProduct);
     
-    setShowProductModal(false);
+    setShowNewItemModal(false);
+    setNewItemData({
+      name: '',
+      price: '',
+      category: 'Tradicionais',
+      description: '',
+      image: null,
+    });
   };
 
-  const handleRemoveItem = (itemId: number) => {
-    setOrderItems(orderItems.filter(item => item.id !== itemId));
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files?.[0]) {
+      setNewItemData({
+        ...newItemData,
+        image: e.target.files[0],
+      });
+    }
   };
 
-  const handleUpdateQuantity = (itemId: number, newQuantity: number) => {
-    if (newQuantity < 1) return;
-    
-    setOrderItems(orderItems.map(item => 
-      item.id === itemId ? { ...item, quantity: newQuantity } : item
-    ));
-  };
-
-  const handleFinishOrder = () => {
-    if (orderItems.length === 0 || !paymentMethod) return;
-    
-    const orderSummary = orderItems.map(item => {
-      let itemText = `${item.quantity}x ${item.name}`;
-      if (item.extras.length > 0) {
-        itemText += ` (${item.extras.map(e => `${e.quantity}x ${e.name}`).join(', ')})`;
-      }
-      if (item.notes) {
-        itemText += ` - Obs: ${item.notes}`;
-      }
-      return itemText;
-    }).join('\n');
-
-    const message = `Pedido La Chapa:\n\n${orderSummary}\n\nTotal: R$ ${total.toFixed(2)}\nForma de Pagamento: ${paymentMethod}`;
-    
-    // Enviar para WhatsApp
-    const whatsappNumber = '558298214100'; // +55 82 98214-1000 sem formatação
-    const encodedMessage = encodeURIComponent(message);
-    window.open(`https://wa.me/${whatsappNumber}?text=${encodedMessage}`, '_blank');
-    
-    setOrderItems([]);
-    setSelectedCustomer(null);
-    setPaymentMethod('');
-  };
+  const totalPrice = orderItems.reduce((sum, item) => {
+    const itemTotal = item.price * item.quantity;
+    const extrasTotal = item.extras.reduce((extrasSum, extra) => extrasSum + (extra.price * extra.quantity), 0);
+    return sum + itemTotal + extrasTotal;
+  }, 0);
 
   return (
     <div className="pdv-container">
-      <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
-      
+      <Sidebar isOpen={isSidebarOpen} />
       <div className="pdv-content">
-        <Header 
-          title="PDV LaChapa" 
-          onMenuClick={() => setIsSidebarOpen(true)}
-        />
+        <Header onMenuClick={() => setIsSidebarOpen(!isSidebarOpen)} />
         
         <div className="pdv-main-layout">
-          {/* Coluna esquerda - Produtos */}
+          {/* Seção de Produtos */}
           <div className="pdv-products-section">
             <div className="pdv-controls">
               <div className="pdv-search-bar">
                 <i className="bi bi-search"></i>
-                <input 
-                  type="text" 
-                  placeholder="Buscar produto pelo nome..." 
+                <input
+                  type="text"
+                  placeholder="Buscar produtos..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
-              
-              <div className="pdv-categories-scroll">
-                {categories.map(category => (
-                  <button 
-                    key={category.id}
-                    className={`category-chip ${activeCategory === category.id ? 'active' : ''}`}
-                    onClick={() => setActiveCategory(category.id)}
-                  >
-                    <i className={`bi ${category.icon}`}></i>
-                    <span>{category.name}</span>
-                  </button>
-                ))}
+
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div className="pdv-categories-scroll">
+                  {categories.map(category => (
+                    <button
+                      key={category.id}
+                      className={`category-chip ${activeCategory === category.id ? 'active' : ''}`}
+                      onClick={() => setActiveCategory(category.id)}
+                    >
+                      <i className={`bi ${category.icon}`}></i>
+                      {category.name}
+                    </button>
+                  ))}
+                </div>
+                
+                {/* Botão Novo Item */}
+                <button
+                  className="btn-new-item"
+                  onClick={() => setShowNewItemModal(true)}
+                  title="Criar novo item no cardápio"
+                >
+                  <Plus size={18} />
+                  Novo Item
+                </button>
               </div>
             </div>
-            
+
+            {/* Grid de Produtos */}
             <div className="pdv-products-grid">
               {filteredProducts.map(product => (
-                <div 
-                  key={product.id} 
-                  className="product-card-modern"
-                  onClick={() => handleProductClick(product)}
-                >
+                <div key={product.id} className="product-card-modern">
                   <div className="product-card-image">
-                    <img src={product.image} alt={product.name} onError={(e) => {
-                      (e.target as HTMLImageElement).src = 'https://via.placeholder.com/150?text=LaChapa';
-                    }} />
+                    <img src={product.image} alt={product.name} />
                     <div className="product-card-category">{product.category}</div>
                   </div>
                   <div className="product-card-details">
                     <h3>{product.name}</h3>
-                    <p className="product-card-desc">{product.description?.substring(0, 60)}...</p>
+                    <p className="product-card-desc">{product.description}</p>
                     <div className="product-card-footer">
                       <span className="product-card-price">R$ {product.price.toFixed(2)}</span>
-                      <button className="product-card-add" onClick={(e) => {
-                        e.stopPropagation();
-                        handleProductClick(product);
-                      }}>
+                      <button
+                        className="product-card-add"
+                        onClick={() => handleAddProduct(product)}
+                      >
                         <Plus size={18} />
                       </button>
                     </div>
@@ -328,76 +321,88 @@ const PDV: React.FC = () => {
               ))}
             </div>
           </div>
-          
-          {/* Coluna direita - Pedido atual */}
+
+          {/* Seção de Pedido */}
           <div className="pdv-order-section">
             <div className="order-card">
               <div className="order-card-header">
                 <div>
-                  <h2>Pedido Atual</h2>
+                  <h2>Pedido</h2>
                   <span className="order-items-count">{orderItems.length} itens</span>
                 </div>
-                <button className="btn-icon-clear" onClick={() => setOrderItems([])} title="Limpar Pedido">
-                  <Trash2 size={18} />
+                <button
+                  className="btn-icon-clear"
+                  onClick={() => setOrderItems([])}
+                  disabled={orderItems.length === 0}
+                >
+                  <Trash2 size={20} />
                 </button>
               </div>
-              
+
               <div className="order-card-body">
                 {/* Cliente */}
-                <div className="order-section-block">
+                <div>
                   <div className="section-title">
                     <i className="bi bi-person"></i>
-                    <span>Cliente</span>
+                    Cliente
                   </div>
                   {selectedCustomer ? (
                     <div className="customer-info-box">
-                      <div className="customer-details">
+                      <div>
                         <p className="customer-name">{selectedCustomer.name}</p>
                         <p className="customer-phone">{selectedCustomer.phone}</p>
                       </div>
-                      <button className="btn-remove-customer" onClick={() => setSelectedCustomer(null)}>
+                      <button
+                        className="btn-icon-clear"
+                        onClick={() => setSelectedCustomer(null)}
+                      >
                         <X size={18} />
                       </button>
                     </div>
                   ) : (
                     <button className="btn-add-customer">
-                      <i className="bi bi-plus-circle"></i>
-                      <span>Vincular Cliente</span>
+                      <Plus size={18} />
+                      Adicionar Cliente
                     </button>
                   )}
                 </div>
-                
-                {/* Itens do pedido */}
+
+                {/* Itens do Pedido */}
                 <div className="order-items-container">
                   <div className="section-title">
-                    <i className="bi bi-list-ul"></i>
-                    <span>Itens do Pedido</span>
+                    <i className="bi bi-bag"></i>
+                    Itens
                   </div>
                   {orderItems.length === 0 ? (
                     <div className="empty-order-state">
                       <div className="empty-icon">
-                        <ShoppingCart size={32} />
+                        <ShoppingCart size={48} />
                       </div>
-                      <p>Seu carrinho está vazio</p>
-                      <span>Selecione produtos ao lado</span>
+                      <p>Nenhum item adicionado</p>
                     </div>
                   ) : (
                     <div className="order-items-scroll">
                       {orderItems.map(item => (
                         <div key={item.id} className="order-item-row">
                           <div className="item-main">
-                            <div className="item-qty-badge">{item.quantity}x</div>
+                            <span className="item-qty-badge">{item.quantity}x</span>
                             <div className="item-text">
                               <p className="item-name">{item.name}</p>
-                              {item.extras.length > 0 && (
-                                <p className="item-extras">{item.extras.map(e => `${e.quantity}x ${e.name}`).join(', ')}</p>
-                              )}
-                              {item.notes && <p className="item-subtext">{item.notes}</p>}
+                              {item.notes && <p className="item-subtext">Obs: {item.notes}</p>}
                             </div>
-                            <div className="item-price-total">
-                              R$ {calculateItemTotal(item).toFixed(2)}
-                            </div>
+                            <span className="item-price-total">R$ {(item.price * item.quantity).toFixed(2)}</span>
                           </div>
+
+                          {item.extras.length > 0 && (
+                            <div style={{ paddingLeft: '28px', fontSize: '0.8rem', color: '#94a3b8', marginBottom: '8px' }}>
+                              {item.extras.map(extra => (
+                                <div key={extra.id}>
+                                  + {extra.quantity}x {extra.name}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
                           <div className="item-controls">
                             <div className="qty-stepper">
                               <button onClick={() => handleUpdateQuantity(item.id, item.quantity - 1)}>
@@ -408,8 +413,11 @@ const PDV: React.FC = () => {
                                 <Plus size={14} />
                               </button>
                             </div>
-                            <button className="btn-item-delete" onClick={() => handleRemoveItem(item.id)}>
-                              <Trash2 size={14} />
+                            <button
+                              className="btn-item-delete"
+                              onClick={() => handleRemoveOrderItem(item.id)}
+                            >
+                              <Trash2 size={16} />
                             </button>
                           </div>
                         </div>
@@ -418,46 +426,32 @@ const PDV: React.FC = () => {
                   )}
                 </div>
               </div>
-              
+
+              {/* Footer */}
               <div className="order-card-footer">
                 <div className="payment-method-section">
-                  <p>Forma de Pagamento</p>
+                  <p>Método de Pagamento</p>
                   <div className="payment-grid">
-                    {[
-                      { id: 'pix', label: 'PIX', icon: 'bi-qr-code' },
-                      { id: 'card', label: 'Cartão', icon: 'bi-credit-card' },
-                      { id: 'cash', label: 'Dinheiro', icon: 'bi-cash-stack' }
-                    ].map(method => (
-                      <button 
-                        key={method.id}
-                        className={`payment-btn ${paymentMethod === method.id ? 'active' : ''}`}
-                        onClick={() => setPaymentMethod(method.id)}
+                    {['Dinheiro', 'Débito', 'Crédito'].map(method => (
+                      <button
+                        key={method}
+                        className={`payment-btn ${paymentMethod === method ? 'active' : ''}`}
+                        onClick={() => setPaymentMethod(method)}
                       >
-                        <i className={`bi ${method.icon}`}></i>
-                        <span>{method.label}</span>
+                        {method}
                       </button>
                     ))}
                   </div>
                 </div>
 
-                <div className="order-summary">
-                  <div className="summary-row">
-                    <span>Subtotal</span>
-                    <span>R$ {subtotal.toFixed(2)}</span>
-                  </div>
-                  <div className="summary-row total">
-                    <span>Total a Pagar</span>
-                    <span>R$ {total.toFixed(2)}</span>
-                  </div>
+                <div className="order-total">
+                  <span>Total:</span>
+                  <span className="total-value">R$ {totalPrice.toFixed(2)}</span>
                 </div>
-                
-                <button 
-                  className="btn-checkout" 
-                  disabled={orderItems.length === 0 || !paymentMethod}
-                  onClick={handleFinishOrder}
-                >
+
+                <button className="btn-confirm-order">
                   <ShoppingCart size={18} />
-                  <span>Finalizar Pedido</span>
+                  Confirmar Pedido
                 </button>
               </div>
             </div>
@@ -467,84 +461,222 @@ const PDV: React.FC = () => {
 
       {/* Modal de Produto */}
       {showProductModal && selectedProduct && (
-        <div className="modern-modal-overlay">
-          <div className="modern-modal animate-slide-up">
-            <div className="modal-banner">
-              <img src={selectedProduct.image} alt={selectedProduct.name} onError={(e) => {
-                (e.target as HTMLImageElement).src = 'https://via.placeholder.com/400x200?text=LaChapa';
-              }} />
-              <button className="modal-close-btn" onClick={() => setShowProductModal(false)}>
+        <div className="modal-overlay" onClick={() => setShowProductModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>{selectedProduct.name}</h2>
+              <button
+                className="modal-close"
+                onClick={() => setShowProductModal(false)}
+              >
                 <X size={24} />
               </button>
             </div>
-            <div className="modal-content">
-              <div className="modal-product-info">
-                <h2>{selectedProduct.name}</h2>
-                <p className="modal-product-price">R$ {selectedProduct.price.toFixed(2)}</p>
-                <p className="modal-product-desc">{selectedProduct.description}</p>
-              </div>
-              
-              {/* Adicionais - apenas para não-bebidas */}
-              {selectedProduct.category !== 'Bebidas' && extrasAvailable[selectedProduct.category] && (
-                <div className="modal-extras-section">
-                  <h3>Adicionais</h3>
-                  <div className="extras-list">
-                    {extrasAvailable[selectedProduct.category].map(extra => {
-                      const selectedExtra = productExtras.find(e => e.id === extra.id);
-                      return (
-                        <div key={extra.id} className="extra-item">
-                          <div className="extra-info">
-                            <label>
-                              <input 
-                                type="checkbox" 
-                                checked={!!selectedExtra}
-                                onChange={() => handleToggleExtra(extra)}
-                              />
-                              <span>{extra.name}</span>
-                            </label>
-                            <span className="extra-price">+R$ {extra.price.toFixed(2)}</span>
-                          </div>
-                          {selectedExtra && (
-                            <div className="extra-qty-control">
-                              <button onClick={() => handleRemoveExtraQuantity(extra.id)}>
-                                <Minus size={14} />
-                              </button>
-                              <span>{selectedExtra.quantity}</span>
-                              <button onClick={() => handleAddExtraQuantity(extra.id)}>
-                                <Plus size={14} />
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-              
-              <div className="modal-form-group">
-                <label>Observações do Item</label>
-                <textarea 
-                  placeholder="Ex: Sem cebola, ponto da carne mal passado..."
-                  value={productNotes}
-                  onChange={(e) => setProductNotes(e.target.value)}
-                ></textarea>
-              </div>
-              
-              <div className="modal-footer">
-                <div className="modal-qty-selector">
+
+            <div className="modal-body">
+              <img src={selectedProduct.image} alt={selectedProduct.name} className="modal-image" />
+              <p className="modal-description">{selectedProduct.description}</p>
+
+              {/* Quantidade */}
+              <div className="modal-section">
+                <label>Quantidade</label>
+                <div className="qty-stepper-large">
                   <button onClick={() => setProductQuantity(Math.max(1, productQuantity - 1))}>
-                    <Minus size={16} />
+                    <Minus size={20} />
                   </button>
                   <span>{productQuantity}</span>
                   <button onClick={() => setProductQuantity(productQuantity + 1)}>
-                    <Plus size={16} />
+                    <Plus size={20} />
                   </button>
                 </div>
-                <button className="btn-modal-add" onClick={handleAddToOrder}>
-                  Adicionar ao Pedido • R$ {(selectedProduct.price * productQuantity + productExtras.reduce((sum, e) => sum + (e.price * e.quantity), 0)).toFixed(2)}
-                </button>
               </div>
+
+              {/* Observações */}
+              <div className="modal-section">
+                <label>Observações</label>
+                <textarea
+                  value={productNotes}
+                  onChange={(e) => setProductNotes(e.target.value)}
+                  placeholder="Ex: Sem cebola, sem tomate..."
+                  className="modal-textarea"
+                />
+              </div>
+
+              {/* Adicionais */}
+              {extrasAvailable[selectedProduct.category] && (
+                <div className="modal-section">
+                  <label>Adicionais</label>
+                  <div className="extras-list">
+                    {extrasAvailable[selectedProduct.category].map(extra => (
+                      <div key={extra.id} className="extra-item">
+                        <div>
+                          <p className="extra-name">{extra.name}</p>
+                          <p className="extra-price">R$ {extra.price.toFixed(2)}</p>
+                        </div>
+                        {productExtras.find(e => e.id === extra.id) ? (
+                          <div className="qty-stepper-small">
+                            <button
+                              onClick={() => {
+                                const current = productExtras.find(e => e.id === extra.id);
+                                if (current && current.quantity > 1) {
+                                  setProductExtras(productExtras.map(e =>
+                                    e.id === extra.id ? { ...e, quantity: e.quantity - 1 } : e
+                                  ));
+                                } else {
+                                  handleRemoveExtra(extra.id);
+                                }
+                              }}
+                            >
+                              <Minus size={16} />
+                            </button>
+                            <span>{productExtras.find(e => e.id === extra.id)?.quantity}</span>
+                            <button onClick={() => handleAddExtra(extra)}>
+                              <Plus size={16} />
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            className="btn-add-extra"
+                            onClick={() => handleAddExtra(extra)}
+                          >
+                            <Plus size={16} />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="modal-footer">
+              <button
+                className="btn-cancel"
+                onClick={() => setShowProductModal(false)}
+              >
+                Cancelar
+              </button>
+              <button
+                className="btn-confirm"
+                onClick={handleConfirmProduct}
+              >
+                Adicionar ao Pedido
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Novo Item */}
+      {showNewItemModal && (
+        <div className="modal-overlay" onClick={() => setShowNewItemModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Criar Novo Item</h2>
+              <button
+                className="modal-close"
+                onClick={() => setShowNewItemModal(false)}
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            <div className="modal-body">
+              {/* Nome */}
+              <div className="modal-section">
+                <label>Nome do Item</label>
+                <input
+                  type="text"
+                  value={newItemData.name}
+                  onChange={(e) => setNewItemData({ ...newItemData, name: e.target.value })}
+                  placeholder="Ex: X-Burger Especial"
+                  className="modal-input"
+                />
+              </div>
+
+              {/* Preço */}
+              <div className="modal-section">
+                <label>Preço (R$)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={newItemData.price}
+                  onChange={(e) => setNewItemData({ ...newItemData, price: e.target.value })}
+                  placeholder="Ex: 25.00"
+                  className="modal-input"
+                />
+              </div>
+
+              {/* Categoria */}
+              <div className="modal-section">
+                <label>Categoria</label>
+                <select
+                  value={newItemData.category}
+                  onChange={(e) => setNewItemData({ ...newItemData, category: e.target.value })}
+                  className="modal-select"
+                >
+                  {categories.map(cat => (
+                    <option key={cat.id} value={cat.id}>{cat.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Descrição */}
+              <div className="modal-section">
+                <label>Descrição</label>
+                <textarea
+                  value={newItemData.description}
+                  onChange={(e) => setNewItemData({ ...newItemData, description: e.target.value })}
+                  placeholder="Descreva os ingredientes e características do item"
+                  className="modal-textarea"
+                />
+              </div>
+
+              {/* Upload de Imagem */}
+              <div className="modal-section">
+                <label>Imagem do Item</label>
+                <div className="image-upload-area">
+                  {newItemData.image ? (
+                    <div className="image-preview">
+                      <img src={URL.createObjectURL(newItemData.image)} alt="Preview" />
+                      <button
+                        className="btn-remove-image"
+                        onClick={() => setNewItemData({ ...newItemData, image: null })}
+                      >
+                        <X size={20} />
+                      </button>
+                    </div>
+                  ) : (
+                    <label className="image-upload-label">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageUpload}
+                        style={{ display: 'none' }}
+                      />
+                      <div className="upload-placeholder">
+                        <Plus size={32} />
+                        <p>Clique para adicionar imagem</p>
+                      </div>
+                    </label>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="modal-footer">
+              <button
+                className="btn-cancel"
+                onClick={() => setShowNewItemModal(false)}
+              >
+                Cancelar
+              </button>
+              <button
+                className="btn-confirm"
+                onClick={handleCreateNewItem}
+              >
+                Criar Item
+              </button>
             </div>
           </div>
         </div>
