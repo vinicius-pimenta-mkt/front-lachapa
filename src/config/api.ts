@@ -1,75 +1,52 @@
-/**
- * Configuração de API para o PDV LaChapa
- * Define a URL base e configurações padrão para chamadas à API
- */
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
 
-// URL base da API - ajuste conforme seu ambiente
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-
-// Configurações padrão para requisições
-export const API_CONFIG = {
-  baseURL: API_BASE_URL,
-  timeout: 10000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-};
-
-/**
- * Função para fazer requisições à API
- */
-export async function apiCall<T>(
-  endpoint: string,
-  options: RequestInit = {}
-): Promise<T> {
-  const url = `${API_BASE_URL}${endpoint}`;
-  
-  const config: RequestInit = {
-    ...options,
-    headers: {
-      ...API_CONFIG.headers,
-      ...options.headers,
-    },
-  };
-
-  try {
-    const response = await fetch(url, config);
-    
-    if (!response.ok) {
-      throw new Error(`API Error: ${response.status} ${response.statusText}`);
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error(`API Call Error [${endpoint}]:`, error);
-    throw error;
-  }
+interface ApiCallOptions {
+  method?: string;
+  headers?: Record<string, string>;
+  body?: string;
+  params?: URLSearchParams;
 }
 
-/**
- * Endpoints da API
- */
+export async function apiCall<T>(endpoint: string, options?: ApiCallOptions): Promise<T> {
+  const url = new URL(`${API_BASE_URL}${endpoint}`);
+  if (options?.params) {
+    options.params.forEach((value, key) => {
+      url.searchParams.append(key, value);
+    });
+  }
+
+  const response = await fetch(url.toString(), {
+    method: options?.method || 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      ...options?.headers,
+    },
+    body: options?.body,
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.detail || 'Erro na requisição da API');
+  }
+
+  return response.json() as Promise<T>;
+}
+
 export const API_ENDPOINTS = {
-  // Pedidos
   pedidos: {
-    list: '/pedidos',
-    get: (id: number) => `/pedidos/${id}`,
-    create: '/pedidos',
-    updateStatus: (id: number) => `/pedidos/${id}/status`,
-    delete: (id: number) => `/pedidos/${id}`,
+    list: '/pedidos/',
+    get: (id: number) => `/pedidos/${id}/`,
+    updateStatus: (id: number) => `/pedidos/${id}/status/`,
   },
-  
-  // Relatórios
   reports: {
-    sales: '/reports/sales',
-    products: '/reports/products',
-    dashboard: '/reports/dashboard',
+    generate: '/reports/',
   },
-  
-  // Usuários
-  users: {
-    login: '/users/login',
-    logout: '/users/logout',
-    profile: '/users/profile',
+  impressora: {
+    list: '/impressoras/',
+    add: '/impressoras/',
+    get: (id: number) => `/impressoras/${id}/`,
+    update: (id: number) => `/impressoras/${id}/`,
+    delete: (id: number) => `/impressoras/${id}/`,
+    test: (id: number) => `/impressoras/${id}/test/`,
   },
 };
