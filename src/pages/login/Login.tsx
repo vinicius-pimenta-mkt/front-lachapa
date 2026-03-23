@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import '../../styles/theme.css';
 import './Login.css';
+import { login } from '../../config/api';
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
@@ -22,20 +23,16 @@ const Login: React.FC = () => {
     setIsLoading(true);
     setError('');
     
-    // Simulação de login - em produção, seria uma chamada à API
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const response = await login(username, password);
       
-      // Simulando credenciais para teste
-      // Credenciais esperadas: admin@lachapa.com / 123456
-      if (username === 'admin@lachapa.com' && password === '123456') {
-        // Redirecionar para o dashboard
+      if (response.success) {
         navigate('/dashboard');
       } else {
-        setError('Usuário ou senha inválidos');
+        setError(response.message || 'Usuário ou senha inválidos');
       }
-    } catch (err) {
-      setError('Erro ao conectar. Tente novamente.');
+    } catch (err: any) {
+      setError(err.message || 'Erro ao conectar. Tente novamente.');
     } finally {
       setIsLoading(false);
     }
@@ -45,7 +42,9 @@ const Login: React.FC = () => {
     <div className="login-container">
       <div className="login-card animate-slide-up">
         <div className="login-logo">
-          <img src="/logo.png" alt="LaChapa PDV" />
+          <img src="/logo.png" alt="LaChapa PDV" onError={(e) => {
+            (e.target as HTMLImageElement).style.display = 'none';
+          }} />
           <h1>LaChapa PDV</h1>
         </div>
         
@@ -61,7 +60,7 @@ const Login: React.FC = () => {
                 id="username"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder="Digite seu usuário"
+                placeholder="Digite seu usuário ou email"
                 disabled={isLoading}
               />
             </div>
