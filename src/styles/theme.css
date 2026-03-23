@@ -1,14 +1,33 @@
 /* Definição da paleta de cores do PDV LaChapa */
 :root {
-  --primary: #E53935;      /* Vermelho - cor primária */
-  --secondary: #FF9800;    /* Laranja - cor secundária */
-  --tertiary: #FFC107;     /* Amarelo - cor terciária */
-  --success: #4CAF50;      /* Verde - para pedidos impressos/finalizados */
-  --info: #2196F3;         /* Azul - informações */
-  --warning: #FF9800;      /* Laranja - alertas/aguardando confirmação */
-  --danger: #B71C1C;       /* Vermelho escuro - erros/perigo */
-  --light: #F5F5F5;        /* Cinza claro - fundo claro */
-  --dark: #424242;         /* Cinza escuro - texto e elementos escuros */
+  --primary: #E53935;
+  --secondary: #FF9800;
+  --tertiary: #FFC107;
+  --success: #4CAF50;
+  --info: #2196F3;
+  --warning: #FF9800;
+  --danger: #B71C1C;
+  --light: #F5F5F5;
+  --dark: #424242;
+  
+  /* Variantes claras para badges e ícones */
+  --color-primary: #E53935;
+  --color-primary-light: rgba(229, 57, 53, 0.12);
+  --color-success: #4CAF50;
+  --color-success-light: rgba(76, 175, 80, 0.12);
+  --color-warning: #FF9800;
+  --color-warning-light: rgba(255, 152, 0, 0.12);
+  --color-danger: #B71C1C;
+  --color-danger-light: rgba(183, 28, 28, 0.12);
+  --color-info: #2196F3;
+  --color-info-light: rgba(33, 150, 243, 0.12);
+  
+  /* Texto */
+  --text-primary: #424242;
+  --text-secondary: #757575;
+  
+  /* Bordas */
+  --border-color: #e0e0e0;
   
   /* Gradientes */
   --gradient-primary: linear-gradient(135deg, var(--primary), var(--danger));
@@ -103,4 +122,27 @@ body {
 
 .animate-slide-up {
   animation: slideUp var(--transition-normal) forwards;
+}
+
+/* Loading state global */
+.loading-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  color: var(--text-secondary);
+  font-size: var(--font-size-md);
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid rgba(229, 57, 53, 0.2);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
