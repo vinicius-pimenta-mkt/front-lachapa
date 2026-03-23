@@ -1,12 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import './Kanban.css';
 import '../../styles/theme.css';
 import Sidebar from '../../components/common/Sidebar';
 import Header from '../../components/common/Header';
+import { fetchPedidos, updatePedidoStatus, deletePedido, printOrderTicket, type Pedido } from '../../config/api';
 
-// Tipos
-interface Order {
-  id: string;
+// Tipos para o Kanban
+interface KanbanOrder {
+  id: number;
   number: string;
   customer: string;
   phone: string;
@@ -15,126 +16,57 @@ interface Order {
   paymentMethod: string;
   status: 'em_analise' | 'em_producao' | 'em_entrega';
   time: string;
-  items: OrderItem[];
-  notes?: string;
-}
-
-interface OrderItem {
-  name: string;
-  quantity: number;
-  price: number;
+  items: { name: string; quantity: number; price: number; notes?: string }[];
   notes?: string;
 }
 
 const Kanban: React.FC = () => {
-  // Estados
-  const [orders, setOrders] = useState<Order[]>([]);
+  const [orders, setOrders] = useState<KanbanOrder[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [selectedOrder, setSelectedOrder] = useState<KanbanOrder | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Dados simulados
-  const mockOrders: Order[] = [
-    {
-      id: '1',
-      number: '20251022-1234',
-      customer: 'João Silva',
-      phone: '(11) 99999-9999',
-      address: 'Av. Paulista, 1000',
-      total: 35.90,
-      paymentMethod: 'card',
-      status: 'em_analise',
-      time: '15:15',
-      items: [
-        { name: 'X-Tudo', quantity: 1, price: 25.90 },
-        { name: 'Refrigerante Lata', quantity: 1, price: 6.00 },
-        { name: 'Batata Frita P', quantity: 1, price: 4.00 }
-      ],
-      notes: 'Sem cebola no X-Tudo. Entregar com guardanapos extras.'
-    },
-    {
-      id: '2',
-      number: '20251022-5678',
-      customer: 'Maria Oliveira',
-      phone: '(11) 98888-8888',
-      address: 'Avenida Brigadeiro Faria Lima, 500',
-      total: 57.50,
-      paymentMethod: 'cash',
-      status: 'em_producao',
-      time: '15:17',
-      items: [
-        { name: 'X-Bacon', quantity: 2, price: 22.90 },
-        { name: 'Batata Frita G', quantity: 1, price: 10.00 },
-        { name: 'Refrigerante 2L', quantity: 1, price: 12.00 }
-      ]
-    },
-    {
-      id: '3',
-      number: '20251022-9012',
-      customer: 'Pedro Santos',
-      phone: '(11) 97777-7777',
-      address: 'Rua Augusta, 200',
-      total: 42.80,
-      paymentMethod: 'pix',
-      status: 'em_analise',
-      time: '15:25',
-      items: [
-        { name: 'X-Salada', quantity: 1, price: 18.90 },
-        { name: 'X-Bacon', quantity: 1, price: 22.90 },
-        { name: 'Água Mineral', quantity: 1, price: 3.00 }
-      ]
-    },
-    {
-      id: '4',
-      number: '20251022-3456',
-      customer: 'Ana Costa',
-      phone: '(11) 96666-6666',
-      address: 'Rua Oscar Freire, 300',
-      total: 68.70,
-      paymentMethod: 'card',
-      status: 'em_producao',
-      time: '15:30',
-      items: [
-        { name: 'Combo Família', quantity: 1, price: 65.90 },
-        { name: 'Sobremesa', quantity: 1, price: 5.00 }
-      ],
-      notes: 'Cliente vai buscar no local.'
-    },
-    {
-      id: '5',
-      number: '20251022-7890',
-      customer: 'Carlos Mendes',
-      phone: '(11) 95555-5555',
-      address: 'Alameda Santos, 700',
-      total: 29.90,
-      paymentMethod: 'cash',
-      status: 'em_entrega',
-      time: '15:10',
-      items: [
-        { name: 'X-Tudo', quantity: 1, price: 25.90 },
-        { name: 'Refrigerante Lata', quantity: 1, price: 6.00 }
-      ],
-      notes: 'Troco para R$ 50,00'
+  // Converter pedido da API para o formato Kanban
+  const mapPedidoToOrder = (pedido: Pedido): KanbanOrder => ({
+    id: pedido.id,
+    number: pedido.numero,
+    customer: pedido.cliente_nome || 'Cliente não informado',
+    phone: pedido.cliente_telefone || '',
+    address: pedido.endereco_entrega || '',
+    total: pedido.valor_total,
+    paymentMethod: pedido.metodo_pagamento || '',
+    status: pedido.status,
+    time: pedido.data_criacao ? new Date(pedido.data_criacao).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '--:--',
+    items: (pedido.itens || []).map(item => ({
+      name: item.produto_nome,
+      quantity: item.quantidade,
+      price: item.valor_unitario,
+      notes: item.observacoes || undefined,
+    })),
+    notes: pedido.observacoes || undefined,
+  });
+
+  const loadOrders = useCallback(async () => {
+    try {
+      setError(null);
+      const pedidos = await fetchPedidos();
+      setOrders(pedidos.map(mapPedidoToOrder));
+    } catch (err: any) {
+      console.error('Erro ao carregar pedidos:', err);
+      setError(err.message || 'Erro ao carregar pedidos');
+    } finally {
+      setIsLoading(false);
     }
-  ];
-
-  // Efeito para carregar os dados
-  useEffect(() => {
-    const fetchOrders = async () => {
-      try {
-        // Simulando chamada à API
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        setOrders(mockOrders);
-      } catch (error) {
-        console.error('Erro ao carregar pedidos:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchOrders();
   }, []);
+
+  useEffect(() => {
+    loadOrders();
+    // Polling a cada 15 segundos para atualizar pedidos
+    const interval = setInterval(loadOrders, 15000);
+    return () => clearInterval(interval);
+  }, [loadOrders]);
 
   // Filtragem de pedidos
   const filteredOrders = orders.filter(order => {
@@ -146,30 +78,48 @@ const Kanban: React.FC = () => {
     );
   });
 
-  // Pedidos separados por status
   const ordersByStatus = {
     em_analise: filteredOrders.filter(order => order.status === 'em_analise'),
     em_producao: filteredOrders.filter(order => order.status === 'em_producao'),
-    em_entrega: filteredOrders.filter(order => order.status === 'em_entrega')
+    em_entrega: filteredOrders.filter(order => order.status === 'em_entrega'),
   };
 
-  // Handlers
-  const handleOrderClick = (order: Order) => {
+  const handleOrderClick = (order: KanbanOrder) => {
     setSelectedOrder(order);
     setShowDetailsModal(true);
   };
 
-  const handleMoveOrder = (order: Order, newStatus: 'em_analise' | 'em_producao' | 'em_entrega') => {
-    // Em um ambiente real, aqui seria feita a chamada à API
-    setOrders(prevOrders =>
-      prevOrders.map(o => 
-        o.id === order.id ? { ...o, status: newStatus } : o
-      )
-    );
+  const handleMoveOrder = async (order: KanbanOrder, newStatus: 'em_analise' | 'em_producao' | 'em_entrega') => {
+    try {
+      await updatePedidoStatus(order.id, newStatus);
+      
+      setOrders(prevOrders =>
+        prevOrders.map(o => o.id === order.id ? { ...o, status: newStatus } : o)
+      );
 
-    // Se estiver movendo para produção, simular impressão
-    if (newStatus === 'em_producao') {
-      alert(`Imprimindo comanda do pedido #${order.number}...`);
+      // Imprimir comanda ao aceitar pedido
+      if (newStatus === 'em_producao') {
+        try {
+          await printOrderTicket(order.id);
+        } catch (printErr) {
+          console.warn('Erro ao imprimir comanda:', printErr);
+        }
+      }
+    } catch (err: any) {
+      console.error('Erro ao mover pedido:', err);
+      alert(`Erro ao atualizar pedido: ${err.message}`);
+    }
+  };
+
+  const handleDeleteOrder = async (orderId: number) => {
+    if (!window.confirm('Tem certeza que deseja excluir este pedido?')) return;
+    
+    try {
+      await deletePedido(orderId);
+      setOrders(prev => prev.filter(o => o.id !== orderId));
+      setShowDetailsModal(false);
+    } catch (err: any) {
+      alert(`Erro ao excluir pedido: ${err.message}`);
     }
   };
 
@@ -182,45 +132,82 @@ const Kanban: React.FC = () => {
     }
   };
 
-  const getStatusClass = (status: string) => {
-    switch (status) {
-      case 'em_analise': return 'status-analise';
-      case 'em_producao': return 'status-producao';
-      case 'em_entrega': return 'status-entrega';
-      default: return '';
-    }
-  };
-
   const getPaymentMethodText = (method: string) => {
     switch (method) {
-      case 'card': return 'Cartão';
-      case 'cash': return 'Dinheiro';
-      case 'pix': return 'PIX';
-      default: return method;
+      case 'card': case 'Crédito': case 'Cartão de Crédito': return 'Cartão';
+      case 'cash': case 'Dinheiro': return 'Dinheiro';
+      case 'pix': case 'Pix': return 'PIX';
+      case 'Débito': case 'Cartão de Débito': return 'Débito';
+      default: return method || 'N/A';
     }
   };
 
   const getPaymentMethodClass = (method: string) => {
     switch (method) {
-      case 'card': return 'payment-card';
-      case 'cash': return 'payment-cash';
-      case 'pix': return 'payment-pix';
+      case 'card': case 'Crédito': case 'Cartão de Crédito': return 'payment-card';
+      case 'cash': case 'Dinheiro': return 'payment-cash';
+      case 'pix': case 'Pix': return 'payment-pix';
       default: return '';
     }
   };
 
-  // Cálculo do tempo de espera
   const calculateWaitTime = (timeString: string) => {
     const [hours, minutes] = timeString.split(':').map(Number);
+    if (isNaN(hours) || isNaN(minutes)) return 0;
     const orderTime = new Date();
     orderTime.setHours(hours, minutes, 0);
-    
     const now = new Date();
     const diffMs = now.getTime() - orderTime.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    
-    return diffMins;
+    return Math.max(0, Math.floor(diffMs / 60000));
   };
+
+  const renderOrderCard = (order: KanbanOrder) => (
+    <div key={order.id} className="order-card" onClick={() => handleOrderClick(order)}>
+      <div className="order-header">
+        <div className="order-number">#{order.number}</div>
+        <div className="order-time">
+          <i className="bi bi-clock"></i>
+          <span>{calculateWaitTime(order.time)} min</span>
+        </div>
+      </div>
+      
+      <div className="order-customer">
+        <strong>{order.customer}</strong>
+        <div>{order.phone}</div>
+      </div>
+      
+      <div className="order-items-preview">
+        {order.items.slice(0, 2).map((item, idx) => (
+          <div key={idx} className="item-preview">
+            {item.quantity}x {item.name}
+          </div>
+        ))}
+        {order.items.length > 2 && (
+          <div className="more-items">+{order.items.length - 2} itens</div>
+        )}
+      </div>
+      
+      <div className="order-footer">
+        <div className="order-total">R$ {order.total.toFixed(2)}</div>
+        <div className={`order-payment ${getPaymentMethodClass(order.paymentMethod)}`}>
+          {getPaymentMethodText(order.paymentMethod)}
+        </div>
+      </div>
+      
+      <div className="order-actions">
+        {order.status === 'em_analise' && (
+          <button className="btn-accept" onClick={(e) => { e.stopPropagation(); handleMoveOrder(order, 'em_producao'); }}>
+            ✓ Aceitar
+          </button>
+        )}
+        {order.status === 'em_producao' && (
+          <button className="btn-deliver" onClick={(e) => { e.stopPropagation(); handleMoveOrder(order, 'em_entrega'); }}>
+            🚀 Enviar
+          </button>
+        )}
+      </div>
+    </div>
+  );
 
   return (
     <div className="kanban-container">
@@ -228,6 +215,15 @@ const Kanban: React.FC = () => {
       
       <div className="kanban-content">
         <Header title="Gestão de Pedidos" />
+        
+        {error && (
+          <div style={{ padding: '12px 16px', margin: '16px 0', background: 'rgba(229,57,53,0.1)', color: '#E53935', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span>⚠️ {error}</span>
+            <button onClick={loadOrders} style={{ background: '#E53935', color: 'white', border: 'none', padding: '6px 16px', borderRadius: '6px', cursor: 'pointer' }}>
+              Tentar novamente
+            </button>
+          </div>
+        )}
         
         <div className="kanban-actions">
           <div className="kanban-search">
@@ -241,11 +237,7 @@ const Kanban: React.FC = () => {
           </div>
           
           <div className="kanban-filters">
-            <button className="filter-btn active">Todos</button>
-            <button className="filter-btn">Últimas 2h</button>
-            <button className="filter-btn">Hoje</button>
-            <button className="filter-btn">Delivery</button>
-            <button className="filter-btn">Balcão</button>
+            <button className="filter-btn active" onClick={loadOrders}>Atualizar</button>
           </div>
         </div>
         
@@ -256,353 +248,126 @@ const Kanban: React.FC = () => {
               <h2>Em análise</h2>
               <span className="order-count">{ordersByStatus.em_analise.length}</span>
             </div>
-            
             <div className="column-content">
               {isLoading ? (
-                <div className="loading-placeholder">
-                  <div className="spinner"></div>
-                  <p>Carregando pedidos...</p>
-                </div>
+                <div className="loading-placeholder"><div className="spinner"></div><p>Carregando...</p></div>
               ) : ordersByStatus.em_analise.length === 0 ? (
-                <div className="empty-column">
-                  <i className="bi bi-inbox"></i>
-                  <p>Nenhum pedido em análise</p>
-                </div>
+                <div className="empty-column"><p>Nenhum pedido em análise</p></div>
               ) : (
-                ordersByStatus.em_analise.map(order => (
-                  <div 
-                    key={order.id} 
-                    className="order-card"
-                    onClick={() => handleOrderClick(order)}
-                  >
-                    <div className="order-header">
-                      <div className="order-number">#{order.number}</div>
-                      <div className="order-time">
-                        <i className="bi bi-clock"></i>
-                        <span>{calculateWaitTime(order.time)} min</span>
-                      </div>
-                    </div>
-                    
-                    <div className="order-customer">
-                      <strong>{order.customer}</strong>
-                      <div>{order.phone}</div>
-                    </div>
-                    
-                    <div className="order-items-preview">
-                      {order.items.slice(0, 2).map((item, idx) => (
-                        <div key={idx} className="item-preview">
-                          {item.quantity}x {item.name}
-                        </div>
-                      ))}
-                      {order.items.length > 2 && (
-                        <div className="more-items">+{order.items.length - 2} itens</div>
-                      )}
-                    </div>
-                    
-                    <div className="order-footer">
-                      <div className="order-total">R$ {order.total.toFixed(2)}</div>
-                      <div className={`order-payment ${getPaymentMethodClass(order.paymentMethod)}`}>
-                        {getPaymentMethodText(order.paymentMethod)}
-                      </div>
-                    </div>
-                    
-                    <div className="order-actions">
-                      <button 
-                        className="action-btn details-btn"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleOrderClick(order);
-                        }}
-                      >
-                        Detalhes
-                      </button>
-                      <button 
-                        className="action-btn approve-btn"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleMoveOrder(order, 'em_producao');
-                        }}
-                      >
-                        Aprovar
-                      </button>
-                    </div>
-                  </div>
-                ))
+                ordersByStatus.em_analise.map(renderOrderCard)
               )}
             </div>
           </div>
-          
+
           {/* Coluna 2: Em produção */}
           <div className="kanban-column producao-column">
             <div className="column-header">
               <h2>Em produção</h2>
               <span className="order-count">{ordersByStatus.em_producao.length}</span>
             </div>
-            
             <div className="column-content">
               {isLoading ? (
-                <div className="loading-placeholder">
-                  <div className="spinner"></div>
-                  <p>Carregando pedidos...</p>
-                </div>
+                <div className="loading-placeholder"><div className="spinner"></div><p>Carregando...</p></div>
               ) : ordersByStatus.em_producao.length === 0 ? (
-                <div className="empty-column">
-                  <i className="bi bi-tools"></i>
-                  <p>Nenhum pedido em produção</p>
-                </div>
+                <div className="empty-column"><p>Nenhum pedido em produção</p></div>
               ) : (
-                ordersByStatus.em_producao.map(order => (
-                  <div 
-                    key={order.id} 
-                    className="order-card"
-                    onClick={() => handleOrderClick(order)}
-                  >
-                    <div className="order-header">
-                      <div className="order-number">#{order.number}</div>
-                      <div className="order-time">
-                        <i className="bi bi-clock"></i>
-                        <span>{calculateWaitTime(order.time)} min</span>
-                      </div>
-                    </div>
-                    
-                    <div className="order-customer">
-                      <strong>{order.customer}</strong>
-                      <div>{order.phone}</div>
-                    </div>
-                    
-                    <div className="order-items-preview">
-                      {order.items.slice(0, 2).map((item, idx) => (
-                        <div key={idx} className="item-preview">
-                          {item.quantity}x {item.name}
-                        </div>
-                      ))}
-                      {order.items.length > 2 && (
-                        <div className="more-items">+{order.items.length - 2} itens</div>
-                      )}
-                    </div>
-                    
-                    <div className="order-footer">
-                      <div className="order-total">R$ {order.total.toFixed(2)}</div>
-                      <div className={`order-payment ${getPaymentMethodClass(order.paymentMethod)}`}>
-                        {getPaymentMethodText(order.paymentMethod)}
-                      </div>
-                    </div>
-                    
-                    <div className="order-actions">
-                      <button 
-                        className="action-btn details-btn"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleOrderClick(order);
-                        }}
-                      >
-                        Detalhes
-                      </button>
-                      <button 
-                        className="action-btn deliver-btn"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleMoveOrder(order, 'em_entrega');
-                        }}
-                      >
-                        Avançar Pedido
-                      </button>
-                    </div>
-                  </div>
-                ))
+                ordersByStatus.em_producao.map(renderOrderCard)
               )}
             </div>
           </div>
-          
-          {/* Coluna 3: Foi pra entrega */}
+
+          {/* Coluna 3: Em entrega */}
           <div className="kanban-column entrega-column">
             <div className="column-header">
-              <h2>Foi pra entrega</h2>
+              <h2>Em entrega</h2>
               <span className="order-count">{ordersByStatus.em_entrega.length}</span>
             </div>
-            
             <div className="column-content">
               {isLoading ? (
-                <div className="loading-placeholder">
-                  <div className="spinner"></div>
-                  <p>Carregando pedidos...</p>
-                </div>
+                <div className="loading-placeholder"><div className="spinner"></div><p>Carregando...</p></div>
               ) : ordersByStatus.em_entrega.length === 0 ? (
-                <div className="empty-column">
-                  <i className="bi bi-truck"></i>
-                  <p>Nenhum pedido em entrega</p>
-                </div>
+                <div className="empty-column"><p>Nenhum pedido em entrega</p></div>
               ) : (
-                ordersByStatus.em_entrega.map(order => (
-                  <div 
-                    key={order.id} 
-                    className="order-card"
-                    onClick={() => handleOrderClick(order)}
-                  >
-                    <div className="order-header">
-                      <div className="order-number">#{order.number}</div>
-                      <div className="order-time">
-                        <i className="bi bi-clock"></i>
-                        <span>{calculateWaitTime(order.time)} min</span>
-                      </div>
-                    </div>
-                    
-                    <div className="order-customer">
-                      <strong>{order.customer}</strong>
-                      <div>{order.phone}</div>
-                    </div>
-                    
-                    <div className="order-items-preview">
-                      {order.items.slice(0, 2).map((item, idx) => (
-                        <div key={idx} className="item-preview">
-                          {item.quantity}x {item.name}
-                        </div>
-                      ))}
-                      {order.items.length > 2 && (
-                        <div className="more-items">+{order.items.length - 2} itens</div>
-                      )}
-                    </div>
-                    
-                    <div className="order-footer">
-                      <div className="order-total">R$ {order.total.toFixed(2)}</div>
-                      <div className={`order-payment ${getPaymentMethodClass(order.paymentMethod)}`}>
-                        {getPaymentMethodText(order.paymentMethod)}
-                      </div>
-                    </div>
-                    
-                    <div className="order-actions">
-                      <button 
-                        className="action-btn details-btn full-width"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleOrderClick(order);
-                        }}
-                      >
-                        Detalhes
-                      </button>
-                    </div>
-                  </div>
-                ))
+                ordersByStatus.em_entrega.map(renderOrderCard)
               )}
             </div>
           </div>
         </div>
       </div>
-      
-      {/* Modal de detalhes do pedido */}
+
+      {/* Modal de Detalhes */}
       {showDetailsModal && selectedOrder && (
-        <div className="order-modal-overlay">
-          <div className="order-modal">
+        <div className="modal-overlay" onClick={() => setShowDetailsModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>Detalhes do Pedido #{selectedOrder.number}</h2>
-              <button onClick={() => setShowDetailsModal(false)}>
-                <i className="bi bi-x-lg"></i>
-              </button>
+              <h2>Pedido #{selectedOrder.number}</h2>
+              <button className="modal-close" onClick={() => setShowDetailsModal(false)}>✕</button>
             </div>
-            
             <div className="modal-body">
-              <div className="order-info-grid">
-                <div className="order-info-section">
-                  <h3>Informações do Cliente</h3>
-                  <p><strong>Nome:</strong> {selectedOrder.customer}</p>
-                  <p><strong>Telefone:</strong> {selectedOrder.phone}</p>
-                  <p><strong>Endereço:</strong> {selectedOrder.address}</p>
+              <div className="detail-group">
+                <strong>Cliente:</strong> {selectedOrder.customer}
+              </div>
+              <div className="detail-group">
+                <strong>Telefone:</strong> {selectedOrder.phone}
+              </div>
+              {selectedOrder.address && (
+                <div className="detail-group">
+                  <strong>Endereço:</strong> {selectedOrder.address}
                 </div>
-                
-                <div className="order-info-section">
-                  <h3>Informações do Pedido</h3>
-                  <p><strong>Número:</strong> #{selectedOrder.number}</p>
-                  <p><strong>Horário:</strong> {selectedOrder.time}</p>
-                  <p>
-                    <strong>Status:</strong> 
-                    <span className={`status-badge ${getStatusClass(selectedOrder.status)}`}>
-                      {getStatusText(selectedOrder.status)}
-                    </span>
-                  </p>
-                  <p>
-                    <strong>Pagamento:</strong> 
-                    <span className={`payment-badge ${getPaymentMethodClass(selectedOrder.paymentMethod)}`}>
-                      {getPaymentMethodText(selectedOrder.paymentMethod)}
-                    </span>
-                  </p>
-                </div>
+              )}
+              <div className="detail-group">
+                <strong>Status:</strong> {getStatusText(selectedOrder.status)}
+              </div>
+              <div className="detail-group">
+                <strong>Pagamento:</strong> {getPaymentMethodText(selectedOrder.paymentMethod)}
               </div>
               
-              <div className="order-items-section">
-                <h3>Itens do Pedido</h3>
-                <table className="items-table">
-                  <thead>
-                    <tr>
-                      <th>Item</th>
-                      <th>Qtd</th>
-                      <th>Valor Unit.</th>
-                      <th>Subtotal</th>
+              <h3 style={{ marginTop: '16px' }}>Itens</h3>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr>
+                    <th style={{ textAlign: 'left', padding: '8px', borderBottom: '1px solid #eee' }}>Item</th>
+                    <th style={{ textAlign: 'center', padding: '8px', borderBottom: '1px solid #eee' }}>Qtd</th>
+                    <th style={{ textAlign: 'right', padding: '8px', borderBottom: '1px solid #eee' }}>Valor</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {selectedOrder.items.map((item, idx) => (
+                    <tr key={idx}>
+                      <td style={{ padding: '8px', borderBottom: '1px solid #f5f5f5' }}>
+                        {item.name}
+                        {item.notes && <div style={{ fontSize: '0.8rem', color: '#999' }}>Obs: {item.notes}</div>}
+                      </td>
+                      <td style={{ textAlign: 'center', padding: '8px', borderBottom: '1px solid #f5f5f5' }}>{item.quantity}</td>
+                      <td style={{ textAlign: 'right', padding: '8px', borderBottom: '1px solid #f5f5f5' }}>R$ {(item.price * item.quantity).toFixed(2)}</td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {selectedOrder.items.map((item, idx) => (
-                      <tr key={idx}>
-                        <td>
-                          {item.name}
-                          {item.notes && <div className="item-note">{item.notes}</div>}
-                        </td>
-                        <td>{item.quantity}</td>
-                        <td>R$ {item.price.toFixed(2)}</td>
-                        <td>R$ {(item.quantity * item.price).toFixed(2)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                  <tfoot>
-                    <tr>
-                      <td colSpan={3} className="total-label">Total</td>
-                      <td className="total-value">R$ {selectedOrder.total.toFixed(2)}</td>
-                    </tr>
-                  </tfoot>
-                </table>
+                  ))}
+                </tbody>
+              </table>
+              
+              <div style={{ textAlign: 'right', fontSize: '1.2rem', fontWeight: 700, marginTop: '12px', color: '#E53935' }}>
+                Total: R$ {selectedOrder.total.toFixed(2)}
               </div>
               
               {selectedOrder.notes && (
-                <div className="order-notes-section">
-                  <h3>Observações</h3>
-                  <p>{selectedOrder.notes}</p>
+                <div className="detail-group" style={{ marginTop: '12px', padding: '10px', background: '#FFF3E0', borderRadius: '6px' }}>
+                  <strong>Observações:</strong> {selectedOrder.notes}
                 </div>
               )}
             </div>
-            
-            <div className="modal-footer">
-              <button 
-                className="btn-close"
-                onClick={() => setShowDetailsModal(false)}
-              >
-                Fechar
-              </button>
-              
+            <div className="modal-footer" style={{ display: 'flex', gap: '8px', padding: '16px', borderTop: '1px solid #eee' }}>
               {selectedOrder.status === 'em_analise' && (
-                <button 
-                  className="btn-approve"
-                  onClick={() => {
-                    handleMoveOrder(selectedOrder, 'em_producao');
-                    setShowDetailsModal(false);
-                  }}
-                >
-                  <i className="bi bi-check2-circle"></i> Aprovar e Imprimir
+                <button className="btn-accept" onClick={() => { handleMoveOrder(selectedOrder, 'em_producao'); setShowDetailsModal(false); }}>
+                  ✓ Aceitar Pedido
                 </button>
               )}
-              
               {selectedOrder.status === 'em_producao' && (
-                <button 
-                  className="btn-deliver"
-                  onClick={() => {
-                    handleMoveOrder(selectedOrder, 'em_entrega');
-                    setShowDetailsModal(false);
-                  }}
-                >
-                  <i className="bi bi-truck"></i> Avançar para Entrega
+                <button className="btn-deliver" onClick={() => { handleMoveOrder(selectedOrder, 'em_entrega'); setShowDetailsModal(false); }}>
+                  🚀 Enviar para Entrega
                 </button>
               )}
-              
-              <button className="btn-print">
-                <i className="bi bi-printer"></i> Reimprimir
+              <button style={{ padding: '8px 16px', background: '#f5f5f5', border: '1px solid #ddd', borderRadius: '6px', cursor: 'pointer' }} onClick={() => handleDeleteOrder(selectedOrder.id)}>
+                🗑️ Excluir
               </button>
             </div>
           </div>
