@@ -1,15 +1,12 @@
 /**
  * Configuração da API - PDV LaChapa
  * 
- * Este arquivo centraliza todas as chamadas à API do backend
- * Substitua a URL base pela URL do seu backend na EasyPanel
- * 
- * Variáveis de ambiente necessárias:
- * - REACT_APP_API_URL: URL base da API (ex: http://localhost:5000/api)
+ * Este arquivo centraliza todas as chamadas à API do backend.
+ * Configure VITE_API_URL no seu .env (ex: http://localhost:5000/api)
  */
 
-// URL base da API
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+// URL base da API - usa Vite env var
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 // ============================================
 // TIPOS E INTERFACES
@@ -48,13 +45,16 @@ export interface SalesReport {
       start_date: string;
       end_date: string;
     };
-    sales: Array<{
-      date: string;
-      total: number;
-      orders: number;
-    }>;
     total_revenue: number;
     total_orders: number;
+    average_ticket: number;
+    sales: Array<{
+      date?: string;
+      week?: string;
+      month?: string;
+      revenue: number;
+      orders: number;
+    }>;
   };
 }
 
@@ -62,10 +62,10 @@ export interface ProductsReport {
   success: boolean;
   data: {
     products: Array<{
-      id: number;
       name: string;
       quantity: number;
       revenue: number;
+      percentage?: number;
     }>;
   };
 }
@@ -84,17 +84,64 @@ export interface DashboardReport {
       revenue_change_percent: number;
     };
     top_products: Array<{
-      id: number;
       name: string;
       quantity: number;
       revenue: number;
     }>;
+    payment_methods: Array<{
+      method: string;
+      total: number;
+      orders: number;
+    }>;
   };
+}
+
+export interface PaymentMethodsReport {
+  success: boolean;
+  data: {
+    period: {
+      start_date: string;
+      end_date: string;
+    };
+    total_revenue: number;
+    payment_methods: Array<{
+      method: string;
+      total: number;
+      orders: number;
+      percentage: number;
+    }>;
+  };
+}
+
+export interface LoginResponse {
+  success: boolean;
+  message: string;
+  token?: string;
+  user?: {
+    id: number;
+    username: string;
+    email: string;
+    role: string;
+  };
+}
+
+export interface User {
+  id: number;
+  username: string;
+  email: string;
+  role?: string;
 }
 
 // ============================================
 // FUNÇÕES AUXILIARES
 // ============================================
+
+/**
+ * Obter token de autenticação armazenado
+ */
+function getAuthToken(): string | null {
+  return localStorage.getItem('auth_token');
+}
 
 /**
  * Fazer requisição à API com tratamento de erro
@@ -104,16 +151,33 @@ async function fetchAPI<T>(
   options: RequestInit = {}
 ): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`;
+  const token = getAuthToken();
   
+  const defaultHeaders: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+
+  if (token) {
+    defaultHeaders['Authorization'] = `Bearer ${token}`;
+  }
+
   const defaultOptions: RequestInit = {
     headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
+      ...defaultHeaders,
+      ...(options.headers as Record<string, string> || {}),
     },
   };
 
   try {
     const response = await fetch(url, { ...defaultOptions, ...options });
+
+    if (response.status === 401) {
+      // Token expirado ou inválido
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('auth_user');
+      window.location.href = '/login';
+      throw new Error('Sessão expirada. Faça login novamente.');
+    }
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
@@ -140,6 +204,58 @@ export function formatDateForAPI(date: Date | string): string {
 }
 
 // ============================================
+// FUNÇÕES DE AUTENTICAÇÃO
+// ============================================
+
+/**
+ * Fazer login
+ */
+export async function login(username: string, password: string): Promise<LoginResponse> {
+  const response = await fetchAPI<LoginResponse>('/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({ username, password }),
+  });
+  
+  if (response.success && response.token) {
+    localStorage.setItem('auth_token', response.token);
+    if (response.user) {
+      localStorage.setItem('auth_user', JSON.stringify(response.user));
+    }
+  }
+  
+  return response;
+}
+
+/**
+ * Fazer logout
+ */
+export function logout(): void {
+  localStorage.removeItem('auth_token');
+  localStorage.removeItem('auth_user');
+  window.location.href = '/login';
+}
+
+/**
+ * Verificar se está autenticado
+ */
+export function isAuthenticated(): boolean {
+  return !!getAuthToken();
+}
+
+/**
+ * Obter usuário autenticado
+ */
+export function getAuthUser(): User | null {
+  const userStr = localStorage.getItem('auth_user');
+  if (!userStr) return null;
+  try {
+    return JSON.parse(userStr);
+  } catch {
+    return null;
+  }
+}
+
+// ============================================
 // FUNÇÕES DE PEDIDOS
 // ============================================
 
@@ -148,14 +264,16 @@ export function formatDateForAPI(date: Date | string): string {
  */
 export async function fetchPedidos(status?: string): Promise<Pedido[]> {
   const query = status ? `?status=${status}` : '';
-  return fetchAPI<Pedido[]>(`/pedidos${query}`);
+  const response = await fetchAPI<{ success: boolean; data: Pedido[] }>(`/pedidos${query}`);
+  return response.data || [];
 }
 
 /**
  * Obter pedido específico por ID
  */
 export async function fetchPedidoById(id: number): Promise<Pedido> {
-  return fetchAPI<Pedido>(`/pedidos/${id}`);
+  const response = await fetchAPI<{ success: boolean; data: Pedido }>(`/pedidos/${id}`);
+  return response.data;
 }
 
 /**
@@ -177,24 +295,25 @@ export async function createPedido(pedido: {
     observacoes?: string;
   }>;
 }): Promise<Pedido> {
-  return fetchAPI<Pedido>('/pedidos', {
+  const response = await fetchAPI<{ success: boolean; data: Pedido }>('/pedidos', {
     method: 'POST',
     body: JSON.stringify(pedido),
   });
+  return response.data;
 }
 
 /**
  * Atualizar status do pedido
- * Status válidos: 'em_analise', 'em_producao', 'em_entrega'
  */
 export async function updatePedidoStatus(
   id: number,
   status: 'em_analise' | 'em_producao' | 'em_entrega'
 ): Promise<Pedido> {
-  return fetchAPI<Pedido>(`/pedidos/${id}/status`, {
+  const response = await fetchAPI<{ success: boolean; data: Pedido }>(`/pedidos/${id}/status`, {
     method: 'PUT',
     body: JSON.stringify({ status }),
   });
+  return response.data;
 }
 
 /**
@@ -207,17 +326,11 @@ export async function deletePedido(id: number): Promise<void> {
 }
 
 /**
- * Aceitar pedido (mover para em_producao)
+ * Buscar pedidos
  */
-export async function acceptPedido(id: number): Promise<Pedido> {
-  return updatePedidoStatus(id, 'em_producao');
-}
-
-/**
- * Marcar pedido como em entrega
- */
-export async function markPedidoForDelivery(id: number): Promise<Pedido> {
-  return updatePedidoStatus(id, 'em_entrega');
+export async function searchPedidos(term: string): Promise<Pedido[]> {
+  const response = await fetchAPI<{ success: boolean; data: Pedido[] }>(`/pedidos/buscar?q=${encodeURIComponent(term)}`);
+  return response.data || [];
 }
 
 // ============================================
@@ -260,15 +373,9 @@ export async function getProductsReport(
   
   let query = `?start_date=${start}&end_date=${end}`;
   
-  if (options?.sortBy) {
-    query += `&sort_by=${options.sortBy}`;
-  }
-  if (options?.order) {
-    query += `&order=${options.order}`;
-  }
-  if (options?.limit !== undefined) {
-    query += `&limit=${options.limit}`;
-  }
+  if (options?.sortBy) query += `&sort_by=${options.sortBy}`;
+  if (options?.order) query += `&order=${options.order}`;
+  if (options?.limit !== undefined) query += `&limit=${options.limit}`;
 
   return fetchAPI<ProductsReport>(`/reports/products${query}`);
 }
@@ -283,33 +390,58 @@ export async function getDashboardReport(
   const start = formatDateForAPI(startDate);
   const end = formatDateForAPI(endDate);
   
-  const query = `?start_date=${start}&end_date=${end}`;
+  return fetchAPI<DashboardReport>(`/reports/dashboard?start_date=${start}&end_date=${end}`);
+}
 
-  return fetchAPI<DashboardReport>(`/reports/dashboard${query}`);
+/**
+ * Obter relatório de métodos de pagamento
+ */
+export async function getPaymentMethodsReport(
+  startDate: string | Date,
+  endDate: string | Date
+): Promise<PaymentMethodsReport> {
+  const start = formatDateForAPI(startDate);
+  const end = formatDateForAPI(endDate);
+  
+  return fetchAPI<PaymentMethodsReport>(`/reports/payment-methods?start_date=${start}&end_date=${end}`);
 }
 
 // ============================================
-// FUNÇÕES DE BUSCA
+// FUNÇÕES DE USUÁRIOS
 // ============================================
 
 /**
- * Buscar pedidos por número, cliente ou telefone
+ * Listar usuários
  */
-export async function searchPedidos(term: string): Promise<Pedido[]> {
-  try {
-    const pedidos = await fetchPedidos();
-    const searchLower = term.toLowerCase();
-    
-    return pedidos.filter(
-      pedido =>
-        pedido.numero.toLowerCase().includes(searchLower) ||
-        pedido.cliente_nome.toLowerCase().includes(searchLower) ||
-        pedido.cliente_telefone.toLowerCase().includes(searchLower)
-    );
-  } catch (error) {
-    console.error('Erro ao buscar pedidos:', error);
-    throw error;
-  }
+export async function fetchUsers(): Promise<User[]> {
+  return fetchAPI<User[]>('/users');
+}
+
+/**
+ * Criar usuário
+ */
+export async function createUser(user: { username: string; email: string; password: string; role?: string }): Promise<User> {
+  return fetchAPI<User>('/users', {
+    method: 'POST',
+    body: JSON.stringify(user),
+  });
+}
+
+/**
+ * Atualizar usuário
+ */
+export async function updateUser(id: number, data: Partial<User>): Promise<User> {
+  return fetchAPI<User>(`/users/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+}
+
+/**
+ * Deletar usuário
+ */
+export async function deleteUser(id: number): Promise<void> {
+  await fetchAPI(`/users/${id}`, { method: 'DELETE' });
 }
 
 // ============================================
@@ -317,124 +449,36 @@ export async function searchPedidos(term: string): Promise<Pedido[]> {
 // ============================================
 
 /**
- * Imprimir comanda do pedido
- * Nota: Esta função pode precisar de um endpoint específico no backend
+ * Imprimir comanda do pedido via backend
  */
-export async function printOrderTicket(pedidoId: number): Promise<void> {
-  try {
-    const pedido = await fetchPedidoById(pedidoId);
-    
-    // Formatar dados para impressão
-    const ticketContent = formatTicketContent(pedido);
-    
-    // Abrir diálogo de impressão
-    const printWindow = window.open('', '', 'height=400,width=600');
-    if (printWindow) {
-      printWindow.document.write('<pre>');
-      printWindow.document.write(ticketContent);
-      printWindow.document.write('</pre>');
-      printWindow.document.close();
-      printWindow.print();
-    }
-  } catch (error) {
-    console.error('Erro ao imprimir comanda:', error);
-    throw error;
-  }
-}
-
-/**
- * Formatar conteúdo do ticket para impressão
- */
-function formatTicketContent(pedido: Pedido): string {
-  let content = '';
-  content += '═══════════════════════════════════\n';
-  content += '          LA CHAPA PDV\n';
-  content += '═══════════════════════════════════\n\n';
-  
-  content += `Pedido: ${pedido.numero}\n`;
-  content += `Data: ${new Date(pedido.data_criacao).toLocaleString('pt-BR')}\n`;
-  content += `Status: ${getStatusText(pedido.status)}\n\n`;
-  
-  content += `Cliente: ${pedido.cliente_nome}\n`;
-  content += `Telefone: ${pedido.cliente_telefone}\n`;
-  if (pedido.endereco_entrega) {
-    content += `Endereço: ${pedido.endereco_entrega}\n`;
-  }
-  content += '\n───────────────────────────────────\n';
-  content += 'ITENS:\n';
-  content += '───────────────────────────────────\n\n';
-  
-  pedido.itens.forEach(item => {
-    content += `${item.quantidade}x ${item.produto_nome}\n`;
-    content += `   R$ ${item.valor_unitario.toFixed(2)} x ${item.quantidade} = R$ ${item.valor_total.toFixed(2)}\n`;
-    if (item.observacoes) {
-      content += `   Obs: ${item.observacoes}\n`;
-    }
-    content += '\n';
+export async function printOrderTicket(pedidoId: number): Promise<{ success: boolean; message: string }> {
+  return fetchAPI<{ success: boolean; message: string }>(`/impressora/imprimir/${pedidoId}`, {
+    method: 'POST',
   });
-  
-  content += '───────────────────────────────────\n';
-  content += `TOTAL: R$ ${pedido.valor_total.toFixed(2)}\n`;
-  content += `Pagamento: ${getPaymentMethodText(pedido.metodo_pagamento)}\n`;
-  
-  if (pedido.observacoes) {
-    content += `\nObservações: ${pedido.observacoes}\n`;
-  }
-  
-  content += '\n═══════════════════════════════════\n';
-  
-  return content;
 }
 
 /**
- * Obter texto do status
+ * Obter configuração da impressora
  */
-function getStatusText(status: string): string {
-  const statusMap: Record<string, string> = {
-    em_analise: 'Em análise',
-    em_producao: 'Em produção',
-    em_entrega: 'Em entrega',
-  };
-  return statusMap[status] || status;
+export async function getPrinterConfig(): Promise<any> {
+  return fetchAPI('/impressora/config');
 }
 
 /**
- * Obter texto do método de pagamento
+ * Salvar configuração da impressora
  */
-function getPaymentMethodText(method: string): string {
-  const methodMap: Record<string, string> = {
-    card: 'Cartão',
-    cash: 'Dinheiro',
-    pix: 'PIX',
-  };
-  return methodMap[method] || method;
+export async function savePrinterConfig(config: any): Promise<any> {
+  return fetchAPI('/impressora/config', {
+    method: 'POST',
+    body: JSON.stringify(config),
+  });
 }
 
-// ============================================
-// EXPORT DEFAULT
-// ============================================
-
-export default {
-  // Pedidos
-  fetchPedidos,
-  fetchPedidoById,
-  createPedido,
-  updatePedidoStatus,
-  deletePedido,
-  acceptPedido,
-  markPedidoForDelivery,
-  
-  // Relatórios
-  getSalesReport,
-  getProductsReport,
-  getDashboardReport,
-  
-  // Busca
-  searchPedidos,
-  
-  // Impressão
-  printOrderTicket,
-  
-  // Utilitários
-  formatDateForAPI,
-};
+/**
+ * Testar impressora
+ */
+export async function testPrinter(): Promise<{ success: boolean; message: string }> {
+  return fetchAPI<{ success: boolean; message: string }>('/impressora/teste', {
+    method: 'POST',
+  });
+}
