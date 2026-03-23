@@ -8,71 +8,97 @@ import SalesChart from '../../components/dashboard/SalesChart';
 import PaymentMethodsChart from '../../components/dashboard/PaymentMethodsChart';
 import MetricCard from '../../components/dashboard/MetricCard';
 import RecentOrdersTable from '../../components/dashboard/RecentOrdersTable';
+import { getDashboardReport, fetchPedidos, formatDateForAPI } from '../../config/api';
 
 const Dashboard: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [metrics, setMetrics] = useState({
     totalSales: 0,
     ordersInProgress: 0,
-    averageTime: 0,
-    topProduct: ''
+    averageTicket: 0,
+    topProduct: '',
+    revenueChange: 0,
   });
-  
-  // Dados simulados para demonstração
-  const mockData = {
-    totalSales: 1250.75,
-    ordersInProgress: 8,
-    averageTime: 22,
-    topProduct: 'X-Tudo',
-    salesByHour: [
-      { hour: '10:00', sales: 320 },
-      { hour: '11:00', sales: 450 },
-      { hour: '12:00', sales: 780 },
-      { hour: '13:00', sales: 890 },
-      { hour: '14:00', sales: 650 },
-      { hour: '15:00', sales: 480 },
-      { hour: '16:00', sales: 380 },
-      { hour: '17:00', sales: 520 },
-      { hour: '18:00', sales: 790 },
-      { hour: '19:00', sales: 950 },
-      { hour: '20:00', sales: 820 },
-      { hour: '21:00', sales: 540 }
-    ],
-    paymentMethods: [
-      { method: 'Dinheiro', value: 35 },
-      { method: 'Cartão de Crédito', value: 42 },
-      { method: 'Cartão de Débito', value: 18 },
-      { method: 'Pix', value: 25 }
-    ],
-    recentOrders: [
-      { id: '20251015-1234', customer: 'João Silva', total: 37.90, status: 'em_producao', time: '15:45' },
-      { id: '20251015-1235', customer: 'Maria Oliveira', total: 52.50, status: 'em_analise', time: '15:42' },
-      { id: '20251015-1236', customer: 'Pedro Santos', total: 28.90, status: 'em_entrega', time: '15:30' },
-      { id: '20251015-1237', customer: 'Ana Costa', total: 45.80, status: 'em_producao', time: '15:25' },
-      { id: '20251015-1238', customer: 'Carlos Mendes', total: 63.70, status: 'em_entrega', time: '15:10' }
-    ]
+  const [salesData, setSalesData] = useState<{ labels: string[]; data: number[] }>({ labels: [], data: [] });
+  const [paymentData, setPaymentData] = useState<{ labels: string[]; data: number[]; colors: string[] }>({ labels: [], data: [], colors: [] });
+  const [recentOrders, setRecentOrders] = useState<any[]>([]);
+
+  const paymentColors: Record<string, string> = {
+    'Dinheiro': '#4CAF50',
+    'Cartão de Crédito': '#E53935',
+    'Cartão de Débito': '#FF9800',
+    'Crédito': '#E53935',
+    'Débito': '#FF9800',
+    'Pix': '#FFEB3B',
+    'pix': '#FFEB3B',
+    'cash': '#4CAF50',
+    'card': '#E53935',
   };
 
   useEffect(() => {
-    // Simulando carregamento de dados da API
-    const fetchData = async () => {
-      try {
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        setMetrics({
-          totalSales: mockData.totalSales,
-          ordersInProgress: mockData.ordersInProgress,
-          averageTime: mockData.averageTime,
-          topProduct: mockData.topProduct
-        });
-      } catch (error) {
-        console.error('Erro ao carregar dados:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     fetchData();
   }, []);
+
+  const fetchData = async () => {
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      const today = new Date();
+      const startOfDay = formatDateForAPI(today);
+      const endOfDay = formatDateForAPI(today);
+
+      // Buscar dashboard report e pedidos recentes em paralelo
+      const [dashboardData, pedidos] = await Promise.all([
+        getDashboardReport(startOfDay, endOfDay),
+        fetchPedidos(),
+      ]);
+
+      if (dashboardData.success) {
+        const { summary, top_products, payment_methods } = dashboardData.data;
+
+        setMetrics({
+          totalSales: summary.total_revenue,
+          ordersInProgress: summary.total_orders,
+          averageTicket: summary.average_ticket,
+          topProduct: top_products.length > 0 ? top_products[0].name : 'N/A',
+          revenueChange: summary.revenue_change_percent,
+        });
+
+        // Preparar dados de métodos de pagamento
+        if (payment_methods && payment_methods.length > 0) {
+          setPaymentData({
+            labels: payment_methods.map(p => p.method),
+            data: payment_methods.map(p => p.total),
+            colors: payment_methods.map(p => paymentColors[p.method] || '#9E9E9E'),
+          });
+        }
+      }
+
+      // Pedidos recentes (últimos 5)
+      if (pedidos && pedidos.length > 0) {
+        const recent = pedidos.slice(0, 5).map(p => ({
+          id: p.numero,
+          customer: p.cliente_nome,
+          total: p.valor_total,
+          status: p.status,
+          time: p.data_criacao ? new Date(p.data_criacao).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '--:--',
+        }));
+        setRecentOrders(recent);
+
+        // Contar pedidos em andamento
+        const inProgress = pedidos.filter(p => p.status === 'em_analise' || p.status === 'em_producao').length;
+        setMetrics(prev => ({ ...prev, ordersInProgress: inProgress }));
+      }
+
+    } catch (err: any) {
+      console.error('Erro ao carregar dados do dashboard:', err);
+      setError(err.message || 'Erro ao carregar dados');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <div className="dashboard-container">
@@ -80,6 +106,15 @@ const Dashboard: React.FC = () => {
       
       <div className="dashboard-content">
         <Header title="Dashboard" />
+        
+        {error && (
+          <div style={{ padding: '12px 16px', margin: '16px 0', background: 'rgba(229,57,53,0.1)', color: '#E53935', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span>⚠️ {error}</span>
+            <button onClick={fetchData} style={{ background: '#E53935', color: 'white', border: 'none', padding: '6px 16px', borderRadius: '6px', cursor: 'pointer' }}>
+              Tentar novamente
+            </button>
+          </div>
+        )}
         
         <div className="dashboard-grid">
           {/* Métricas principais */}
@@ -90,6 +125,7 @@ const Dashboard: React.FC = () => {
               icon={<DollarSign size={24} />}
               color="primary"
               isLoading={isLoading}
+              change={metrics.revenueChange !== 0 ? { value: Math.abs(metrics.revenueChange), isPositive: metrics.revenueChange > 0 } : undefined}
             />
             <MetricCard 
               title="Pedidos em Andamento" 
@@ -99,8 +135,8 @@ const Dashboard: React.FC = () => {
               isLoading={isLoading}
             />
             <MetricCard 
-              title="Tempo Médio" 
-              value={`${metrics.averageTime} min`} 
+              title="Ticket Médio" 
+              value={`R$ ${metrics.averageTicket.toFixed(2)}`} 
               icon={<Clock size={24} />}
               color="info"
               isLoading={isLoading}
@@ -117,13 +153,13 @@ const Dashboard: React.FC = () => {
           {/* Gráficos */}
           <div className="charts-container">
             <div className="chart-card">
-              <h3>Vendas por Hora</h3>
+              <h3>Vendas</h3>
               <SalesChart data={{
-                labels: mockData.salesByHour.map(item => item.hour),
+                labels: salesData.labels.length > 0 ? salesData.labels : ['Sem dados'],
                 datasets: [{
                   label: 'Vendas',
-                  data: mockData.salesByHour.map(item => item.sales),
-                  backgroundColor: 'rgba(255, 152, 0, 0.6)', // Orange
+                  data: salesData.data.length > 0 ? salesData.data : [0],
+                  backgroundColor: 'rgba(255, 152, 0, 0.6)',
                   borderColor: 'rgba(255, 152, 0, 1)',
                   tension: 0.4,
                   fill: true,
@@ -134,11 +170,11 @@ const Dashboard: React.FC = () => {
             <div className="chart-card">
               <h3>Métodos de Pagamento</h3>
               <PaymentMethodsChart data={{
-                labels: mockData.paymentMethods.map(item => item.method),
+                labels: paymentData.labels.length > 0 ? paymentData.labels : ['Sem dados'],
                 datasets: [{
-                  data: mockData.paymentMethods.map(item => item.value),
-                  backgroundColor: ['#E53935', '#FF9800', '#4CAF50', '#FFEB3B'], // Red, Orange, Green, Yellow
-                  borderColor: ['#E53935', '#FF9800', '#4CAF50', '#FFEB3B'],
+                  data: paymentData.data.length > 0 ? paymentData.data : [1],
+                  backgroundColor: paymentData.colors.length > 0 ? paymentData.colors : ['#E0E0E0'],
+                  borderColor: paymentData.colors.length > 0 ? paymentData.colors : ['#E0E0E0'],
                   borderWidth: 1,
                 }]
               }} isLoading={isLoading} />
@@ -148,7 +184,7 @@ const Dashboard: React.FC = () => {
           {/* Pedidos Recentes */}
           <div className="recent-orders-container">
             <h3>Pedidos Recentes</h3>
-            <RecentOrdersTable orders={mockData.recentOrders} isLoading={isLoading} />
+            <RecentOrdersTable orders={recentOrders} isLoading={isLoading} />
           </div>
         </div>
       </div>
