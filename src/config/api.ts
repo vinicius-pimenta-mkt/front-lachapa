@@ -2,11 +2,11 @@
  * Configuração da API - PDV LaChapa
  * 
  * Este arquivo centraliza todas as chamadas à API do backend.
- * Configure VITE_API_URL no seu .env (ex: http://localhost:5000/api)
+ * Configure VITE_API_URL no seu .env (ex: https://pdv.unvgroup.tech/api)
  */
 
 // URL base da API - usa Vite env var
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://pdv.unvgroup.tech/api';
 
 // ============================================
 // TIPOS E INTERFACES
