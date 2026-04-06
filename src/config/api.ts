@@ -6,7 +6,7 @@
  */
 
 // URL base da API - usa Vite env var
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://pdv.unvgroup.tech';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://pdv.unvgroup.tech/api';
 
 // ============================================
 // TIPOS E INTERFACES
